@@ -1,26 +1,42 @@
 @import "tailwindcss";
 
+@theme {
+  --color-marca-50: #eef6f4;
+  --color-marca-100: #d5ebe5;
+  --color-marca-500: #1f8a70;
+  --color-marca-600: #17725c;
+  --color-marca-700: #115a49;
+  --color-tinta: #1c2424;
+  --color-suave: #5f6b6b;
+  --color-borde: #dfe5e4;
+  --color-fondo: #f5f7f6;
+  --color-alerta: #c62828;
+  --color-alerta-50: #fdecec;
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-fondo);
+  color: var(--color-tinta);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Que los números de las tablas queden alineados */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+dialog::backdrop {
+  background: rgb(0 0 0 / 0.4);
+}
+
+/* Evita que el iPhone haga zoom al tocar un campo (necesita 16px) */
+input,
+select,
+textarea {
+  font-size: 16px;
 }
