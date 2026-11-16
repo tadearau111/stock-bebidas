@@ -1131,3 +1131,8 @@ on conflict do nothing;
 
 revoke all on all tables in schema public from anon;
 revoke execute on all functions in schema public from anon;
+
+-- ===== supabase/migrations/20261118000002_tragos_personal.sql =====
+-- Los tragos y vasos también se pueden cargar como consumo de personal
+-- (antes solo en cortesías).
+alter table public.retiros drop constraint if exists trago_solo_en_cortesia;

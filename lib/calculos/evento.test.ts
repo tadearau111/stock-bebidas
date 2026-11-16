@@ -3,7 +3,7 @@ import {
   bebidaAbiertaPorArticulo,
   costosDelEvento,
   soloBotellas,
-  tragosDeCortesia,
+  tragosRetirados,
   consumido,
   faltaEnDeposito,
   formatoBotellas,
@@ -247,17 +247,17 @@ describe('Costos del evento', () => {
   })
 })
 
-describe('Tragos y vasos de cortesía', () => {
+describe('Tragos y vasos retirados', () => {
   const retiros = [
     { articulo_id: 'coca', trago_id: null, tipo: 'cortesia' as const, cantidad: 2 },
     { articulo_id: null, trago_id: 't1', tipo: 'cortesia' as const, cantidad: 3, trago: { nombre: 'Trago Absolut' } },
-    { articulo_id: null, trago_id: 't1', tipo: 'cortesia' as const, cantidad: 2, trago: { nombre: 'Trago Absolut' } },
+    { articulo_id: null, trago_id: 't1', tipo: 'personal' as const, cantidad: 2, trago: { nombre: 'Trago Absolut' } },
     { articulo_id: null, trago_id: 't2', tipo: 'cortesia' as const, cantidad: 1, trago: { nombre: 'Vaso gaseosa' } },
   ]
-  it('suma los vasos por trago', () => {
-    expect(tragosDeCortesia(retiros)).toEqual([
-      { nombre: 'Trago Absolut', vasos: 5 },
-      { nombre: 'Vaso gaseosa', vasos: 1 },
+  it('suma los vasos por trago, separando personal y cortesía', () => {
+    expect(tragosRetirados(retiros)).toEqual([
+      { nombre: 'Trago Absolut', personal: 2, cortesia: 3, vasos: 5 },
+      { nombre: 'Vaso gaseosa', personal: 0, cortesia: 1, vasos: 1 },
     ])
   })
   it('los tragos no cuentan como botellas en el resumen ni descuentan venta', () => {

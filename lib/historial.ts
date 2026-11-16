@@ -22,7 +22,7 @@ export interface Nombres {
 
 const SUJETOS: Record<string, string> = {
   articulos: 'artículo',
-  tragos: 'trago de cortesía',
+  tragos: 'trago o vaso',
   movimientos: 'movimiento del depósito',
   eventos: 'evento',
   barras: 'barra',

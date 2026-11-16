@@ -6,7 +6,7 @@ import { mensajeError } from '@/lib/formato'
 import { useGuardarTrago, useTragos } from '@/lib/tragos'
 import type { Trago } from '@/lib/tipos'
 
-/** Lista de tragos y vasos que se pueden dar de cortesía (se cuentan en vasos). */
+/** Lista de tragos y vasos para los retiros de personal y cortesías (se cuentan en vasos). */
 export function ListaTragos() {
   const { data: tragos } = useTragos()
   const guardar = useGuardarTrago()
@@ -28,7 +28,7 @@ export function ListaTragos() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-suave">
-        Se usan en las <b className="text-tinta">cortesías</b> de las barras y se cuentan en vasos. Son informativos: no descuentan del depósito, porque salen de
+        Se usan en los <b className="text-tinta">retiros</b> de las barras (consumo de personal y cortesías) y se cuentan en vasos. Son informativos: no descuentan del depósito, porque salen de
         las botellas que ya están en la barra.
       </p>
       <form

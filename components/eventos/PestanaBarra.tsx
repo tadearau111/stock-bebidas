@@ -637,7 +637,7 @@ function FormRetiro({ barra, lineas, eventoId, alTerminar }: { barra: Barra; lin
   const { puede } = useSesion()
   const { data: tragos } = useTragos()
   const guardarTrago = useGuardarTrago()
-  // "a:<id>" = botella de la barra · "t:<id>" = trago o vaso (solo cortesías)
+  // "a:<id>" = botella de la barra · "t:<id>" = trago o vaso
   const [eleccion, setEleccion] = useState(lineas.length === 1 ? `a:${lineas[0].articulo_id}` : '')
   const [tipo, setTipo] = useState<'personal' | 'cortesia'>('personal')
   const [nuevoTrago, setNuevoTrago] = useState<string | null>(null)
@@ -652,7 +652,6 @@ function FormRetiro({ barra, lineas, eventoId, alTerminar }: { barra: Barra; lin
     setError('')
     const n = Number(cantidad)
     if (!eleccion) return setError('Elegí qué se retiró.')
-    if (esTrago && tipo !== 'cortesia') return setError('Los tragos y vasos solo se cargan como cortesía.')
     if (!Number.isInteger(n) || n <= 0) return setError('La cantidad tiene que ser un número entero mayor a 0.')
     if (!quien.trim()) return setError('Anotá quién lo retiró.')
     try {
@@ -686,21 +685,13 @@ function FormRetiro({ barra, lineas, eventoId, alTerminar }: { barra: Barra; lin
             ['cortesia', 'Cortesía'],
           ] as const
         ).map(([t, texto]) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => {
-              setTipo(t)
-              if (t === 'personal' && esTrago) setEleccion('')
-            }}
-            className={cx('rounded-md py-2', tipo === t ? 'plata font-semibold' : 'text-suave')}
-          >
+          <button key={t} type="button" onClick={() => setTipo(t)} className={cx('rounded-md py-2', tipo === t ? 'plata font-semibold' : 'text-suave')}>
             {texto}
           </button>
         ))}
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">{tipo === 'cortesia' ? 'Botella, trago o vaso *' : 'Artículo *'}</label>
+        <label className="mb-1 block text-sm font-medium">Botella, trago o vaso *</label>
         <select
           value={eleccion}
           onChange={(e) => setEleccion(e.target.value)}
@@ -714,20 +705,18 @@ function FormRetiro({ barra, lineas, eventoId, alTerminar }: { barra: Barra; lin
               </option>
             ))}
           </optgroup>
-          {tipo === 'cortesia' && (
-            <optgroup label="Tragos y vasos">
-              {(tragos ?? [])
-                .filter((t) => t.activo)
-                .map((t) => (
-                  <option key={t.id} value={`t:${t.id}`}>
-                    {t.nombre}
-                  </option>
-                ))}
-            </optgroup>
-          )}
+          <optgroup label="Tragos y vasos">
+            {(tragos ?? [])
+              .filter((t) => t.activo)
+              .map((t) => (
+                <option key={t.id} value={`t:${t.id}`}>
+                  {t.nombre}
+                </option>
+              ))}
+          </optgroup>
         </select>
         {esTrago && <p className="mt-1 text-xs text-suave">Se cuenta en vasos. Es informativo: no descuenta del depósito (sale de las botellas de la barra).</p>}
-        {tipo === 'cortesia' && puede('articulos.editar') && nuevoTrago == null && (
+        {puede('articulos.editar') && nuevoTrago == null && (
           <button type="button" onClick={() => setNuevoTrago('')} className="mt-1 text-sm text-marca-700 underline">
             + Agregar otro trago o vaso a la lista
           </button>

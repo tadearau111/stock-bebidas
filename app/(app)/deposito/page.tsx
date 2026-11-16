@@ -180,7 +180,7 @@ export default function PaginaDeposito() {
         </>
       )}
 
-      <Ventana abierta={accion?.tipo === 'tragos'} alCerrar={() => cerrar()} titulo="Tragos y vasos de cortesía">
+      <Ventana abierta={accion?.tipo === 'tragos'} alCerrar={() => cerrar()} titulo="Tragos y vasos">
         {accion?.tipo === 'tragos' && <ListaTragos />}
       </Ventana>
       <Ventana abierta={accion?.tipo === 'nuevo'} alCerrar={() => cerrar()} titulo="Nuevo artículo">

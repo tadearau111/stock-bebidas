@@ -291,19 +291,23 @@ export function costosDelEvento(
   }
 }
 
-// ------------------------------------------------------------------ Tragos de cortesía
+// ------------------------------------------------------------------ Tragos y vasos retirados
 
 /** Separa los retiros de botellas (cuentan en el resumen) de los tragos/vasos (informativos). */
 export function soloBotellas<T extends { articulo_id: string | null }>(retiros: T[]): (T & { articulo_id: string })[] {
   return retiros.filter((r): r is T & { articulo_id: string } => r.articulo_id != null)
 }
 
-/** Total de vasos de cortesía por trago: "Trago Absolut" → 5. */
-export function tragosDeCortesia(retiros: { trago_id: string | null; cantidad: number; trago?: { nombre: string } | null }[]) {
-  const m = new Map<string, { nombre: string; vasos: number }>()
+/** Vasos por trago, separados en personal y cortesía: "Trago Absolut" → 2 personal, 3 cortesía. */
+export function tragosRetirados(
+  retiros: { trago_id: string | null; tipo: TipoRetiro; cantidad: number; trago?: { nombre: string } | null }[],
+) {
+  const m = new Map<string, { nombre: string; personal: number; cortesia: number; vasos: number }>()
   for (const r of retiros) {
     if (!r.trago_id) continue
-    const actual = m.get(r.trago_id) ?? { nombre: r.trago?.nombre ?? 'Trago', vasos: 0 }
+    const actual = m.get(r.trago_id) ?? { nombre: r.trago?.nombre ?? 'Trago', personal: 0, cortesia: 0, vasos: 0 }
+    if (r.tipo === 'personal') actual.personal += r.cantidad
+    else actual.cortesia += r.cantidad
     actual.vasos += r.cantidad
     m.set(r.trago_id, actual)
   }
