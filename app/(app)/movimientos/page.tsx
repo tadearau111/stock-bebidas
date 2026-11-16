@@ -36,7 +36,7 @@ function Movimientos() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">Movimientos del depósito</h1>
+        <h1 className="text-2xl font-semibold">Movimientos del depósito</h1>
         <p className="text-sm text-suave">Ingresos de compras y ajustes manuales. El stock se calcula a partir de esta lista.</p>
       </div>
 

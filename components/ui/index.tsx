@@ -9,9 +9,9 @@ const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).jo
 type Variante = 'primario' | 'secundario' | 'peligro' | 'fantasma'
 
 const estilos: Record<Variante, string> = {
-  primario: 'bg-marca-600 text-white hover:bg-marca-700 disabled:bg-marca-600/50',
-  secundario: 'bg-white text-tinta border border-borde hover:bg-fondo disabled:opacity-50',
-  peligro: 'bg-white text-alerta border border-alerta/40 hover:bg-alerta-50 disabled:opacity-50',
+  primario: 'plata disabled:opacity-50',
+  secundario: 'bg-superficie text-tinta border border-borde hover:bg-realce disabled:opacity-50',
+  peligro: 'bg-superficie text-alerta border border-alerta/40 hover:bg-alerta-50 disabled:opacity-50',
   fantasma: 'text-marca-700 hover:bg-marca-50 disabled:opacity-50',
 }
 
@@ -58,7 +58,7 @@ export function Campo({
         id={id}
         {...props}
         className={cx(
-          'block min-h-11 w-full rounded-lg border bg-white px-3 outline-none focus:border-marca-500 focus:ring-2 focus:ring-marca-100',
+          'block min-h-11 w-full rounded-lg border bg-superficie px-3 outline-none focus:border-marca-500 focus:ring-2 focus:ring-marca-100',
           error ? 'border-alerta' : 'border-borde',
         )}
       />
@@ -86,7 +86,7 @@ export function Selector({
       <select
         id={id}
         {...props}
-        className="block min-h-11 w-full rounded-lg border border-borde bg-white px-3 outline-none focus:border-marca-500 focus:ring-2 focus:ring-marca-100"
+        className="block min-h-11 w-full rounded-lg border border-borde bg-superficie px-3 outline-none focus:border-marca-500 focus:ring-2 focus:ring-marca-100"
       >
         {children}
       </select>
@@ -122,7 +122,7 @@ export function Ventana({
       ref={ref}
       onClose={() => abiertaRef.current && alCerrar()}
       onClick={(e) => e.target === ref.current && alCerrar()}
-      className="m-0 mt-auto w-full max-w-none rounded-t-2xl bg-white p-0 text-tinta shadow-xl sm:m-auto sm:max-w-lg sm:rounded-2xl"
+      className="m-0 mt-auto w-full max-w-none rounded-t-2xl bg-superficie p-0 text-tinta shadow-2xl shadow-black border border-borde sm:m-auto sm:max-w-lg sm:rounded-2xl"
     >
       {abierta && (
         <div className="flex max-h-[90dvh] flex-col">
@@ -131,7 +131,7 @@ export function Ventana({
             <button
               type="button"
               onClick={alCerrar}
-              className="-mr-2 flex size-10 items-center justify-center rounded-full text-2xl leading-none text-suave hover:bg-fondo"
+              className="-mr-2 flex size-10 items-center justify-center rounded-full text-2xl leading-none text-suave hover:bg-realce"
               aria-label="Cerrar"
             >
               ×
@@ -156,7 +156,7 @@ export function Aviso({ tipo = 'error', children }: { tipo?: 'error' | 'info' | 
 }
 
 export function Tarjeta({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cx('rounded-xl border border-borde bg-white', className)}>{children}</div>
+  return <div className={cx('rounded-xl border border-borde bg-superficie', className)}>{children}</div>
 }
 
 export function Cargando({ texto = 'Cargando…' }: { texto?: string }) {

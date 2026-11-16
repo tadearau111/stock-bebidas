@@ -132,12 +132,12 @@ function ElegirArticulo({
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
         placeholder="Buscá el artículo…"
-        className="block min-h-11 w-full rounded-lg border border-borde bg-white px-3 outline-none focus:border-marca-500 focus:ring-2 focus:ring-marca-100"
+        className="block min-h-11 w-full rounded-lg border border-borde bg-superficie px-3 outline-none focus:border-marca-500 focus:ring-2 focus:ring-marca-100"
       />
       <ul className="mt-1 max-h-56 divide-y divide-borde overflow-y-auto rounded-lg border border-borde">
         {opciones.map((a) => (
           <li key={a.id}>
-            <button type="button" onClick={() => alElegir(a)} className="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-fondo">
+            <button type="button" onClick={() => alElegir(a)} className="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-realce">
               <span>
                 <span className="font-medium">{a.nombre}</span>
                 {detalleArticulo(a) && <span className="block text-xs text-suave">{detalleArticulo(a)}</span>}
@@ -304,7 +304,7 @@ export function FormAjuste({ articulo, alTerminar }: { articulo: Articulo; alTer
               setModo(m)
               setValor('')
             }}
-            className={cx('rounded-md py-2', modo === m ? 'bg-white font-semibold shadow-sm' : 'text-suave')}
+            className={cx('rounded-md py-2', modo === m ? 'bg-superficie font-semibold shadow-sm' : 'text-suave')}
           >
             {t}
           </button>

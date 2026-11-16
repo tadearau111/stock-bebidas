@@ -3,14 +3,14 @@ import { Proveedores } from '@/lib/sesion'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Stock de Bebidas',
+  title: 'HUB · Stock de Bebidas',
   description: 'Control del depósito y de las barras de cada evento',
 }
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#17725c',
+  themeColor: '#050505',
 }
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {

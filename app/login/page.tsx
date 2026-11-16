@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, type FormEvent } from 'react'
+import { Logo } from '@/components/marca'
 import { Aviso, Boton, Campo, Cargando } from '@/components/ui'
 import { mensajeError } from '@/lib/formato'
 import { useSesion } from '@/lib/sesion'
@@ -31,14 +32,15 @@ export default function PaginaLogin() {
   if (cargando || session) return <Cargando />
 
   return (
-    <main className="flex min-h-dvh items-center justify-center px-4">
-      <form onSubmit={entrar} className="w-full max-w-sm space-y-4 rounded-2xl border border-borde bg-white p-6 shadow-sm">
-        <div className="mb-2 text-center">
-          <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-xl bg-marca-600 text-2xl text-white">
-            🍾
-          </div>
-          <h1 className="text-xl font-bold">Stock de Bebidas</h1>
-          <p className="text-sm text-suave">Ingresá con tu email y contraseña</p>
+    <main className="flex min-h-dvh items-center justify-center bg-[radial-gradient(ellipse_at_top,#1f1f22_0%,#050505_60%)] px-4">
+      <form
+        onSubmit={entrar}
+        className="w-full max-w-sm space-y-4 rounded-2xl border border-borde bg-superficie/90 p-6 shadow-2xl shadow-black backdrop-blur"
+      >
+        <div className="mb-4 text-center">
+          <Logo tamano={72} className="mx-auto mb-5" />
+          <h1 className="texto-plata text-2xl font-semibold">Stock de Bebidas</h1>
+          <p className="mt-1 text-sm text-suave">Ingresá con tu email y contraseña</p>
         </div>
         <Campo etiqueta="Email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         <Campo

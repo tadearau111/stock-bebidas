@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { FormAjuste, FormArticulo, FormIngreso } from '@/components/deposito/formularios'
+import { IconoBuscar } from '@/components/marca'
 import { Aviso, Boton, Cargando, Etiqueta, Tarjeta, Ventana, cx } from '@/components/ui'
 import { coincideBusqueda } from '@/lib/calculos/stock'
 import { useArticulos, useBorrarArticulo, useGuardarArticulo } from '@/lib/datos'
@@ -49,7 +50,7 @@ export default function PaginaDeposito() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Depósito</h1>
+        <h1 className="text-2xl font-semibold">Depósito</h1>
         <div className="flex gap-2">
           {puede('articulos.editar') && (
             <Boton variante="secundario" onClick={() => setAccion({ tipo: 'nuevo' })}>
@@ -63,14 +64,17 @@ export default function PaginaDeposito() {
       {mensaje && <Aviso tipo="ok">✓ {mensaje}</Aviso>}
 
       <div className="flex flex-col gap-2 sm:flex-row">
-        <input
-          type="search"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="🔍 Buscar por nombre, marca o tamaño"
-          className="min-h-11 flex-1 rounded-lg border border-borde bg-white px-3 outline-none focus:border-marca-500 focus:ring-2 focus:ring-marca-100"
-        />
-        <div className="grid grid-cols-3 gap-1 rounded-lg border border-borde bg-white p-1 text-sm sm:w-auto">
+        <div className="relative flex-1">
+          <IconoBuscar className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-suave" width={18} height={18} />
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por nombre, marca o tamaño"
+            className="min-h-11 w-full rounded-lg border border-borde bg-superficie pl-10 pr-3 outline-none placeholder:text-suave focus:border-marca-500 focus:ring-2 focus:ring-marca-100"
+          />
+        </div>
+        <div className="grid grid-cols-3 gap-1 rounded-lg border border-borde bg-superficie p-1 text-sm sm:w-auto">
           {(
             [
               ['activos', 'Todos'],
@@ -81,7 +85,7 @@ export default function PaginaDeposito() {
             <button
               key={f}
               onClick={() => setFiltro(f)}
-              className={cx('whitespace-nowrap rounded-md px-3 py-1.5', filtro === f ? 'bg-marca-600 font-semibold text-white' : 'text-suave hover:bg-fondo')}
+              className={cx('whitespace-nowrap rounded-md px-3 py-1.5', filtro === f ? 'plata font-semibold' : 'text-suave hover:bg-realce')}
             >
               {t}
             </button>
@@ -106,7 +110,7 @@ export default function PaginaDeposito() {
                 <button
                   onClick={() => setAccion({ tipo: 'opciones', articulo: a })}
                   className={cx(
-                    'flex w-full items-center justify-between rounded-xl border bg-white px-4 py-3 text-left',
+                    'flex w-full items-center justify-between rounded-xl border bg-superficie px-4 py-3 text-left',
                     a.bajo_minimo ? 'border-alerta/50 bg-alerta-50' : 'border-borde',
                   )}
                 >
@@ -141,7 +145,7 @@ export default function PaginaDeposito() {
               </thead>
               <tbody className="divide-y divide-borde">
                 {lista.map((a) => (
-                  <tr key={a.id} className={cx(a.bajo_minimo ? 'bg-alerta-50' : 'hover:bg-fondo')}>
+                  <tr key={a.id} className={cx(a.bajo_minimo ? 'bg-alerta-50' : 'hover:bg-realce')}>
                     <td className={cx('px-4 py-2.5 font-medium', a.bajo_minimo && 'text-alerta')}>
                       {a.nombre} {a.bajo_minimo && <Etiqueta color="rojo">Faltan {formatoNumero(a.faltante)}</Etiqueta>}
                     </td>
@@ -255,7 +259,7 @@ function OpcionesArticulo({
         )}
         <Link
           href={`/movimientos?articulo=${a.id}`}
-          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-borde bg-white px-4 text-sm font-semibold hover:bg-fondo"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-borde bg-superficie px-4 text-sm font-semibold hover:bg-realce"
         >
           Ver movimientos
         </Link>

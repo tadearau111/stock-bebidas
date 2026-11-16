@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { FormIngreso } from '@/components/deposito/formularios'
+import { IconoCarrito, IconoDeposito, IconoEventos, IconoIngreso } from '@/components/marca'
 import { Aviso, Cargando, Tarjeta, Ventana, cx } from '@/components/ui'
 import { useArticulos, useMovimientos } from '@/lib/datos'
 import { formatoCantidad, formatoFechaHora, mensajeError } from '@/lib/formato'
@@ -17,7 +18,7 @@ export default function PaginaInicio() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Hola{nombre ? `, ${nombre.split(' ')[0]}` : ''} 👋</h1>
+        <h1 className="text-2xl font-semibold">Hola{nombre ? `, ${nombre.split(' ')[0]}` : ''}</h1>
         <p className="text-suave">Esto es lo que necesitás saber hoy.</p>
       </div>
 
@@ -26,10 +27,10 @@ export default function PaginaInicio() {
       {/* Accesos rápidos */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {puede('ingresos.cargar') && (
-          <AccesoRapido icono="📥" titulo="Nuevo ingreso" onClick={() => setIngreso(true)} />
+          <AccesoRapido icono={<IconoIngreso width={24} height={24} />} titulo="Nuevo ingreso" onClick={() => setIngreso(true)} />
         )}
-        <AccesoRapido icono="🎉" titulo="Nuevo evento" detalle="Disponible en la Fase 2" deshabilitado />
-        {verDeposito && <AccesoRapido icono="📦" titulo="Ver depósito" href="/deposito" />}
+        <AccesoRapido icono={<IconoEventos width={24} height={24} />} titulo="Nuevo evento" detalle="Disponible en la Fase 2" deshabilitado />
+        {verDeposito && <AccesoRapido icono={<IconoDeposito width={24} height={24} />} titulo="Ver depósito" href="/deposito" />}
       </div>
 
       {verDeposito && <AlertasMinimo />}
@@ -62,7 +63,7 @@ function AccesoRapido({
   onClick,
   deshabilitado,
 }: {
-  icono: string
+  icono: ReactNode
   titulo: string
   detalle?: string
   href?: string
@@ -70,12 +71,12 @@ function AccesoRapido({
   deshabilitado?: boolean
 }) {
   const clase = cx(
-    'flex flex-col items-start gap-1 rounded-xl border border-borde bg-white p-4 text-left transition-colors',
+    'flex flex-col items-start gap-1 rounded-xl border border-borde bg-superficie p-4 text-left transition-colors',
     deshabilitado ? 'cursor-not-allowed opacity-50' : 'hover:border-marca-500 hover:bg-marca-50',
   )
   const contenido = (
     <>
-      <span className="text-2xl">{icono}</span>
+      <span className="mb-1 flex size-10 items-center justify-center rounded-lg border border-borde bg-realce text-marca-600">{icono}</span>
       <span className="font-semibold">{titulo}</span>
       {detalle && <span className="text-xs text-suave">{detalle}</span>}
     </>
@@ -96,7 +97,7 @@ function AlertasMinimo() {
   return (
     <section>
       <div className="mb-2 flex items-baseline justify-between">
-        <h2 className="text-lg font-semibold">🛒 Qué comprar</h2>
+        <h2 className="flex items-center gap-2 text-lg font-semibold"><IconoCarrito className="text-marca-600" /> Qué comprar</h2>
         {bajos.length > 0 && <span className="text-sm text-alerta">{bajos.length} por debajo del mínimo</span>}
       </div>
       {isPending ? (
