@@ -2,13 +2,22 @@
 
 import { useMemo } from 'react'
 import { Aviso, Tarjeta, cx } from '@/components/ui'
-import { bebidaAbiertaPorArticulo, formatoBotellas, resumirEvento, soloBotellas, sumarFracciones, tragosRetirados } from '@/lib/calculos/evento'
+import {
+  bebidaAbiertaPorArticulo,
+  detalleRetiros,
+  formatoBotellas,
+  resumirEvento,
+  soloBotellas,
+  sumarFracciones,
+  textoTotalRetiros,
+  tragosRetirados,
+} from '@/lib/calculos/evento'
 import { BotonesExportar } from '@/components/Exportar'
 import { useArticulos } from '@/lib/datos'
 import { reporteEvento } from '@/lib/exportar/reportes'
 import { useSesion } from '@/lib/sesion'
-import { formatoCantidad, formatoNumero, formatoPesos, formatoVasos } from '@/lib/formato'
-import type { DetalleEvento } from '@/lib/tipos'
+import { formatoCantidad, formatoHora, formatoNumero, formatoPesos, formatoVasos } from '@/lib/formato'
+import type { DetalleEvento, RetiroDB } from '@/lib/tipos'
 
 export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
   const { data: articulos } = useArticulos()
@@ -39,6 +48,9 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
 
   const abierta = useMemo(() => bebidaAbiertaPorArticulo(bebidaAbierta), [bebidaAbierta])
   const tragos = useMemo(() => tragosRetirados(retiros), [retiros])
+  const personal = useMemo(() => detalleRetiros(retiros, 'personal'), [retiros])
+  const cortesias = useMemo(() => detalleRetiros(retiros, 'cortesia'), [retiros])
+  const nombreBarra = (id: string) => barras.find((b) => b.id === id)?.nombre ?? 'Barra'
   const nombreAbierta = (id: string) => bebidaAbierta.find((b) => b.articulo_id === id)?.articulo?.nombre ?? '¿?'
   const hayPrecios = resumen.totales.costo != null || resumen.totales.facturacion != null
   const negativos = resumen.filas.filter((f) => f.ventaEstimada < 0)
@@ -62,8 +74,16 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Dato titulo="Personas" valor={formatoNumero(evento.personas)} />
         <Dato titulo="Barras" valor={formatoNumero(barras.length)} />
-        <Dato titulo="Retiros personal" valor={formatoNumero(resumen.totales.retirosPersonal)} />
-        <Dato titulo="Cortesías" valor={formatoNumero(resumen.totales.cortesias)} />
+        <Dato
+          titulo="Retiros de personal"
+          valor={formatoNumero(personal.cantidadRetiros)}
+          detalle={personal.cantidadRetiros ? textoTotalRetiros(personal) : undefined}
+        />
+        <Dato
+          titulo="Cortesías"
+          valor={formatoNumero(cortesias.cantidadRetiros)}
+          detalle={cortesias.cantidadRetiros ? textoTotalRetiros(cortesias) : undefined}
+        />
         {hayPrecios && (
           <>
             <Dato titulo="Costo estimado" valor={formatoPesos(resumen.totales.costo)} ancho />
@@ -166,6 +186,14 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
         </>
       )}
 
+      <ListaRetiros
+        titulo="Retiros de personal"
+        ayuda="Lo que retiró el personal, botellas y tragos. Salen de lo cargado en las barras (ya están dentro del consumido)."
+        detalle={personal}
+        nombreBarra={nombreBarra}
+      />
+      <ListaRetiros titulo="Cortesías" ayuda="Lo que se dio de cortesía, botellas y tragos." detalle={cortesias} nombreBarra={nombreBarra} />
+
       {tragos.length > 0 && (
         <section className="space-y-2">
           <h3 className="text-lg font-semibold">Tragos y vasos retirados</h3>
@@ -230,12 +258,57 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
   )
 }
 
-function Dato({ titulo, valor, ancho }: { titulo: string; valor: string; ancho?: boolean }) {
+function Dato({ titulo, valor, detalle, ancho }: { titulo: string; valor: string; detalle?: string; ancho?: boolean }) {
   return (
     <Tarjeta className={cx('px-3 py-2.5', ancho && 'col-span-2')}>
       <p className="text-xs text-suave">{titulo}</p>
       <p className="tabular text-lg font-semibold">{valor}</p>
+      {detalle && <p className="tabular text-xs text-suave">{detalle}</p>}
     </Tarjeta>
+  )
+}
+
+/** Lista de retiros de un tipo con quién retiró, qué, cuánto, barra y hora. */
+function ListaRetiros({
+  titulo,
+  ayuda,
+  detalle,
+  nombreBarra,
+}: {
+  titulo: string
+  ayuda: string
+  detalle: { lista: RetiroDB[]; cantidadRetiros: number; unidades: number; vasos: number }
+  nombreBarra: (id: string) => string
+}) {
+  return (
+    <section className="space-y-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <h3 className="text-lg font-semibold">{titulo}</h3>
+        <p className="tabular text-sm text-suave">
+          {detalle.cantidadRetiros} {detalle.cantidadRetiros === 1 ? 'retiro' : 'retiros'} · Total: <b className="text-tinta">{textoTotalRetiros(detalle)}</b>
+        </p>
+      </div>
+      <p className="text-xs text-suave">{ayuda}</p>
+      {detalle.lista.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-borde px-3 py-3 text-center text-sm text-suave">No hay.</p>
+      ) : (
+        <Tarjeta className="divide-y divide-borde">
+          {detalle.lista.map((r) => (
+            <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+              <div className="min-w-0">
+                <p className="truncate font-medium">{r.retirado_por}</p>
+                <p className="truncate text-xs text-suave">
+                  {r.articulo?.nombre ?? r.trago?.nombre} · {nombreBarra(r.barra_id)} · {formatoHora(r.hora)}
+                </p>
+              </div>
+              <span className="tabular shrink-0 font-semibold">
+                {r.trago_id ? formatoVasos(r.cantidad) : formatoCantidad(r.cantidad, r.articulo?.unidad)}
+              </span>
+            </div>
+          ))}
+        </Tarjeta>
+      )}
+    </section>
   )
 }
 

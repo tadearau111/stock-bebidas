@@ -5,9 +5,11 @@ import {
   bebidaAbiertaPorArticulo,
   consumido,
   costosDelEvento,
+  detalleRetiros,
   formatoBotellas,
   resumirEvento,
   soloBotellas,
+  textoTotalRetiros,
   totalReposiciones,
   tragosRetirados,
   type ArticuloPrecio,
@@ -245,20 +247,25 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
     })
   }
 
-  if (retiros.length > 0) {
+  const personal = detalleRetiros(retiros, 'personal')
+  const cortesias = detalleRetiros(retiros, 'cortesia')
+  for (const [titulo, d] of [
+    ['Retiros de personal', personal],
+    ['Cortesías', cortesias],
+  ] as const) {
+    if (d.cantidadRetiros === 0) continue
     secciones.push({
-      titulo: 'Retiros',
-      columnas: [{ titulo: 'Barra' }, { titulo: 'Tipo' }, { titulo: 'Qué' }, { titulo: 'Cantidad', tipo: 'numero' }, { titulo: 'Retiró' }, { titulo: 'Hora' }],
-      filas: [...retiros]
-        .sort((a, b) => a.hora.localeCompare(b.hora))
-        .map((r) => [
-          nombreBarra(r.barra_id),
-          r.tipo === 'personal' ? 'Personal' : 'Cortesía',
-          (r.articulo?.nombre ?? r.trago?.nombre ?? '¿?') + (r.trago_id ? ' (vasos)' : ''),
-          r.cantidad,
-          r.retirado_por,
-          fechaHora.format(new Date(r.hora)).replace(/ | /g, ' '),
-        ]),
+      titulo,
+      columnas: [{ titulo: 'Quién retiró' }, { titulo: 'Qué' }, { titulo: 'Cantidad', tipo: 'numero' }, { titulo: 'Medida' }, { titulo: 'Barra' }, { titulo: 'Hora' }],
+      filas: d.lista.map((r) => [
+        r.retirado_por,
+        r.articulo?.nombre ?? r.trago?.nombre ?? '¿?',
+        r.cantidad,
+        r.trago_id ? (r.cantidad === 1 ? 'vaso' : 'vasos') : unidadTexto(r.articulo?.unidad ?? 'unidad', r.cantidad),
+        nombreBarra(r.barra_id),
+        fechaHora.format(new Date(r.hora)).replace(/\u00a0|\u202f/g, ' '),
+      ]),
+      total: [`Total: ${d.cantidadRetiros} ${d.cantidadRetiros === 1 ? 'retiro' : 'retiros'}`, null, null, textoTotalRetiros(d), null, null],
     })
   }
 
@@ -307,8 +314,8 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
     ['Fecha', fechaEvento(evento.fecha)],
     ['Personas', numero.format(evento.personas)],
     ['Barras', numero.format(barras.length)],
-    ['Retiros de personal', numero.format(resumen.totales.retirosPersonal)],
-    ['Cortesías', numero.format(resumen.totales.cortesias)],
+    ['Retiros de personal', personal.cantidadRetiros ? `${personal.cantidadRetiros} (${textoTotalRetiros(personal)})` : '0'],
+    ['Cortesías', cortesias.cantidadRetiros ? `${cortesias.cantidadRetiros} (${textoTotalRetiros(cortesias)})` : '0'],
   ]
   if (opciones.incluirCostos) {
     datos.push(['Total precio costo', textoCelda(costos.totalCosto, 'pesos')], ['Total precio venta', textoCelda(costos.totalVenta, 'pesos')])
@@ -326,10 +333,17 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
         (f.pendiente ? ' ⚠ falta final' : ''),
     ),
   ]
-  if (resumen.totales.retirosPersonal || resumen.totales.cortesias) {
-    lineasWa.push('', `Retiros personal: ${numero.format(resumen.totales.retirosPersonal)} · Cortesías: ${numero.format(resumen.totales.cortesias)}`)
+  for (const [titulo, d] of [
+    ['Retiros de personal', personal],
+    ['Cortesías', cortesias],
+  ] as const) {
+    if (d.cantidadRetiros === 0) continue
+    lineasWa.push('', `*${titulo}* (${textoTotalRetiros(d)})`)
+    for (const r of d.lista) {
+      const cuanto = r.trago_id ? `${r.cantidad} ${r.cantidad === 1 ? 'vaso' : 'vasos'}` : `${r.cantidad} ${unidadTexto(r.articulo?.unidad ?? 'unidad', r.cantidad)}`
+      lineasWa.push(`• ${r.retirado_por}: ${r.articulo?.nombre ?? r.trago?.nombre} ${cuanto}`)
+    }
   }
-  if (tragos.length) lineasWa.push(`Tragos/vasos retirados: ${numero.format(tragos.reduce((t, x) => t + x.vasos, 0))}`)
   if (abierta.size) lineasWa.push(`Bebida abierta: ${[...abierta.entries()].map(([id, n]) => `${nombreAbierta(id)} ${formatoBotellas(n)}`).join(', ')}`)
   if (opciones.incluirCostos) {
     lineasWa.push('', `*Total costo:* ${textoCelda(costos.totalCosto, 'pesos')}`, `*Total venta:* ${textoCelda(costos.totalVenta, 'pesos')}`)

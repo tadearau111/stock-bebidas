@@ -313,3 +313,46 @@ export function tragosRetirados(
   }
   return [...m.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
 }
+
+// ------------------------------------------------------------------ Detalle de retiros
+
+export interface RetiroParaDetalle {
+  barra_id: string
+  articulo_id: string | null
+  trago_id: string | null
+  tipo: TipoRetiro
+  cantidad: number
+  retirado_por: string
+  hora: string
+  articulo?: { nombre: string; unidad?: 'unidad' | 'bolsa' } | null
+  trago?: { nombre: string } | null
+}
+
+export interface DetalleRetiros<T> {
+  lista: T[] // ordenada por hora
+  cantidadRetiros: number
+  unidades: number // botellas / unidades del depósito
+  vasos: number // tragos y vasos
+}
+
+/**
+ * Todos los retiros de un tipo (personal o cortesía), botellas Y tragos,
+ * con los totales separados: las unidades de botella y los vasos no se suman entre sí.
+ */
+export function detalleRetiros<T extends RetiroParaDetalle>(retiros: T[], tipo: TipoRetiro): DetalleRetiros<T> {
+  const lista = retiros.filter((r) => r.tipo === tipo).sort((a, b) => a.hora.localeCompare(b.hora))
+  return {
+    lista,
+    cantidadRetiros: lista.length,
+    unidades: lista.filter((r) => !r.trago_id).reduce((t, r) => t + r.cantidad, 0),
+    vasos: lista.filter((r) => r.trago_id).reduce((t, r) => t + r.cantidad, 0),
+  }
+}
+
+/** "3 u. y 2 vasos", "3 u.", "2 vasos" o "—" */
+export function textoTotalRetiros(d: { unidades: number; vasos: number }): string {
+  const partes: string[] = []
+  if (d.unidades) partes.push(`${d.unidades} u.`)
+  if (d.vasos) partes.push(`${d.vasos} ${d.vasos === 1 ? 'vaso' : 'vasos'}`)
+  return partes.join(' y ') || '—'
+}

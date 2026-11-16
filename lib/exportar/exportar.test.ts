@@ -89,7 +89,16 @@ const detalle: DetalleEvento = {
 describe('Resumen de evento', () => {
   it('con costos: tiene consumo, barras, retiros, tragos, bebida abierta y costos', () => {
     const r = reporteEvento(detalle, articulos, { incluirCostos: true })
-    expect(r.secciones.map((s) => s.titulo)).toEqual(['Consumo total por artículo', 'Barra 1', 'Barra VIP', 'Retiros', 'Tragos y vasos retirados', 'Bebida abierta', 'Costos'])
+    expect(r.secciones.map((s) => s.titulo)).toEqual(['Consumo total por artículo', 'Barra 1', 'Barra VIP', 'Retiros de personal', 'Cortesías', 'Tragos y vasos retirados', 'Bebida abierta', 'Costos'])
+    // cortesía de trago: cuenta en el detalle y en el total
+    const cort = r.secciones.find((s) => s.titulo === 'Cortesías')!
+    expect(cort.filas).toEqual([['Mesa 1', 'Trago Absolut', 3, 'vasos', 'Barra 1', expect.any(String)]])
+    expect(cort.total?.[0]).toBe('Total: 1 retiro')
+    expect(cort.total?.[3]).toBe('3 vasos')
+    expect(r.datos.find((d) => d[0] === 'Cortesías')?.[1]).toBe('1 (3 vasos)')
+    expect(r.datos.find((d) => d[0] === 'Retiros de personal')?.[1]).toBe('1 (2 u.)')
+    expect(r.textoWhatsApp).toContain('• Mesa 1: Trago Absolut 3 vasos')
+    expect(r.textoWhatsApp).toContain('• Juan: Coca Cola 2 u.')
     // Coca: barra 1 consumió 10, VIP 10 → 20; personal 2 → venta 18
     expect(r.secciones[0].filas[0]).toEqual(['Coca Cola', 20, 2, 0, 18, 0.2])
     const costos = r.secciones.find((s) => s.titulo === 'Costos')!
@@ -111,7 +120,7 @@ describe('Archivos', () => {
     const blob = await reporteAExcel(r)
     const libro = new ExcelJS.Workbook()
     await libro.xlsx.load(await blob.arrayBuffer())
-    expect(libro.worksheets.map((h) => h.name)).toEqual(['Resumen', 'Consumo total por artículo', 'Barra 1', 'Barra VIP', 'Retiros', 'Tragos y vasos retirados', 'Bebida abierta', 'Costos'])
+    expect(libro.worksheets.map((h) => h.name)).toEqual(['Resumen', 'Consumo total por artículo', 'Barra 1', 'Barra VIP', 'Retiros de personal', 'Cortesías', 'Tragos y vasos retirados', 'Bebida abierta', 'Costos'])
     const consumo = libro.getWorksheet('Consumo total por artículo')!
     expect(consumo.getRow(2).getCell(1).value).toBe('Coca Cola')
     expect(consumo.getRow(2).getCell(2).value).toBe(20) // número real, no texto

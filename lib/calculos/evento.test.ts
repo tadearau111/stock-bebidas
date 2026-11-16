@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   bebidaAbiertaPorArticulo,
   costosDelEvento,
+  detalleRetiros,
+  textoTotalRetiros,
   soloBotellas,
   tragosRetirados,
   consumido,
@@ -265,5 +267,40 @@ describe('Tragos y vasos retirados', () => {
     expect(r.filas[0].cortesias).toBe(2)
     expect(r.filas[0].ventaEstimada).toBe(8)
     expect(r.filas).toHaveLength(1)
+  })
+})
+
+describe('Detalle de retiros (personal y cortesías)', () => {
+  const r = (tipo: 'personal' | 'cortesia', cantidad: number, quien: string, hora: string, trago = false) => ({
+    barra_id: 'b1',
+    articulo_id: trago ? null : 'coca',
+    trago_id: trago ? 't1' : null,
+    tipo,
+    cantidad,
+    retirado_por: quien,
+    hora,
+  })
+  const retiros = [
+    r('personal', 1, 'Juan', '2026-11-21T02:00:00Z'),
+    r('personal', 2, 'Pedro', '2026-11-21T01:00:00Z', true),
+    r('cortesia', 3, 'Mesa 4', '2026-11-21T03:00:00Z'),
+  ]
+  it('cuenta TODOS los retiros de personal, también los tragos', () => {
+    const d = detalleRetiros(retiros, 'personal')
+    expect(d.cantidadRetiros).toBe(2)
+    expect(d.unidades).toBe(1)
+    expect(d.vasos).toBe(2)
+    expect(d.lista.map((x) => x.retirado_por)).toEqual(['Pedro', 'Juan']) // por hora
+  })
+  it('las cortesías aparte', () => {
+    const d = detalleRetiros(retiros, 'cortesia')
+    expect(d.cantidadRetiros).toBe(1)
+    expect(d.unidades).toBe(3)
+    expect(d.vasos).toBe(0)
+  })
+  it('texto del total sin mezclar unidades con vasos', () => {
+    expect(textoTotalRetiros({ unidades: 1, vasos: 2 })).toBe('1 u. y 2 vasos')
+    expect(textoTotalRetiros({ unidades: 0, vasos: 1 })).toBe('1 vaso')
+    expect(textoTotalRetiros({ unidades: 0, vasos: 0 })).toBe('—')
   })
 })
