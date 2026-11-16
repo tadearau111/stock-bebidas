@@ -45,6 +45,14 @@ Vas a necesitar tres cuentas gratis: **GitHub**, **Supabase** y **Vercel**.
 4. Tocá **Deploy**. En 1 o 2 minutos te da un link del tipo `stock-bebidas.vercel.app`.
 5. Volvé a Supabase. Entrá a **Authentication**, después a **URL Configuration**, y en **Site URL** pegá ese link.
 
+6. Para poder crear usuarios desde la app, agregá en Vercel una tercera variable **de tipo Secret**:
+
+   | Name | Value |
+   |---|---|
+   | `SUPABASE_SECRET_KEY` | En Supabase: Project Settings → API Keys → **Secret keys** (empieza con `sb_secret_`) |
+
+   Esta sí es privada: no la compartas con nadie.
+
 Listo: abrí el link desde el celular o la computadora e ingresá con tu email y contraseña.
 
 ---

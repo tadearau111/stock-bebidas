@@ -106,3 +106,28 @@ export const IconoBuscar = (p: Icono) => (
     <path d="m20 20-3.5-3.5" />
   </Base>
 )
+
+export const IconoUsuarios = (p: Icono) => (
+  <Base {...p}>
+    <circle cx="9" cy="8" r="3.5" />
+    <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+    <path d="M16 4.5a3.5 3.5 0 0 1 0 7" />
+    <path d="M18 14.5a6.5 6.5 0 0 1 3.5 5.5" />
+  </Base>
+)
+
+export const IconoHistorial = (p: Icono) => (
+  <Base {...p}>
+    <path d="M3 12a9 9 0 1 0 3-6.7" />
+    <path d="M3 4v4.5h4.5" />
+    <path d="M12 7.5V12l3 2" />
+  </Base>
+)
+
+export const IconoMas = (p: Icono) => (
+  <Base {...p}>
+    <circle cx="5" cy="12" r="1.4" />
+    <circle cx="12" cy="12" r="1.4" />
+    <circle cx="19" cy="12" r="1.4" />
+  </Base>
+)

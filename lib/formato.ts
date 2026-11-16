@@ -43,10 +43,14 @@ export function leerPrecio(texto: string): number | null {
 export function mensajeError(error: unknown): string {
   const e = error as { message?: string; code?: string } | null
   const msg = e?.message ?? String(error)
+  if (msg.includes('roles_nombre_key')) return 'Ya existe un rol con ese nombre.'
+  if (msg.includes('evento_asignaciones_pkey')) return 'Ese evento ya estaba asignado.'
   if (e?.code === '23505' || msg.includes('articulos_nombre_unico')) return 'Ya existe un artículo con ese nombre.'
+  if (e?.code === '23503' && msg.includes('miembros')) return 'No se puede borrar: hay usuarios con ese rol.'
   if (e?.code === '23503') return 'No se puede borrar porque tiene historial. Podés desactivarlo.'
   if (e?.code === '42501' || msg.includes('row-level security')) return 'No tenés permiso para hacer esto.'
   if (msg.includes('Invalid login credentials')) return 'Email o contraseña incorrectos.'
+  if (/banned/i.test(msg)) return 'Tu usuario está desactivado. Hablá con la administradora.'
   if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) return 'No hay conexión. Probá de nuevo en un momento.'
   return msg
 }

@@ -2,24 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, type ReactNode, type SVGProps } from 'react'
-import { IconoDeposito, IconoEventos, IconoInicio, IconoMovimientos, Marca } from '@/components/marca'
+import { useEffect, type ReactNode } from 'react'
+import { IconoMas, Marca } from '@/components/marca'
+import { secciones } from '@/components/navegacion'
 import { Boton, Cargando, cx } from '@/components/ui'
 import { useSesion } from '@/lib/sesion'
-import type { Permiso } from '@/lib/tipos'
 
-const secciones: {
-  href: string
-  etiqueta: string
-  Icono: (p: SVGProps<SVGSVGElement>) => ReactNode
-  permiso?: Permiso
-  activaEn?: string[]
-}[] = [
-  { href: '/', etiqueta: 'Inicio', Icono: IconoInicio },
-  { href: '/eventos', etiqueta: 'Eventos', Icono: IconoEventos, activaEn: ['/evento'] },
-  { href: '/deposito', etiqueta: 'Depósito', Icono: IconoDeposito, permiso: 'deposito.ver' },
-  { href: '/movimientos', etiqueta: 'Movimientos', Icono: IconoMovimientos, permiso: 'deposito.ver' },
-]
 
 export default function LayoutApp({ children }: { children: ReactNode }) {
   const router = useRouter()
@@ -45,6 +33,11 @@ export default function LayoutApp({ children }: { children: ReactNode }) {
   }
 
   const visibles = secciones.filter((s) => !s.permiso || puede(s.permiso))
+  // En el celular entran 5 botones: si hay más, los últimos van a "Más"
+  const enCelular =
+    visibles.length <= 5
+      ? visibles
+      : [...visibles.slice(0, 4), { href: '/mas', etiqueta: 'Más', Icono: IconoMas, activaEn: visibles.slice(4).map((s) => s.href) }]
   const activa = (s: (typeof secciones)[number]) =>
     s.href === '/' ? ruta === '/' : ruta === s.href || ruta.startsWith(s.href + '/') || !!s.activaEn?.includes(ruta)
 
@@ -97,9 +90,9 @@ export default function LayoutApp({ children }: { children: ReactNode }) {
       {/* Menú inferior (celular) */}
       <nav
         className="fixed inset-x-0 bottom-0 z-10 grid border-t border-borde bg-superficie pb-[env(safe-area-inset-bottom)] md:hidden"
-        style={{ gridTemplateColumns: `repeat(${visibles.length}, minmax(0, 1fr))` }}
+        style={{ gridTemplateColumns: `repeat(${enCelular.length}, minmax(0, 1fr))` }}
       >
-        {visibles.map((s) => (
+        {enCelular.map((s) => (
           <Link
             key={s.href}
             href={s.href}
