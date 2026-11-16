@@ -2,17 +2,22 @@
 
 import Link from 'next/link'
 import { useState, type ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import { FormIngreso } from '@/components/deposito/formularios'
+import { FormEvento } from '@/components/eventos/FormEvento'
 import { IconoCarrito, IconoDeposito, IconoEventos, IconoIngreso } from '@/components/marca'
 import { Aviso, Cargando, Tarjeta, Ventana, cx } from '@/components/ui'
 import { useArticulos, useMovimientos } from '@/lib/datos'
-import { formatoCantidad, formatoFechaHora, mensajeError } from '@/lib/formato'
+import { useEventos } from '@/lib/eventos'
+import { eventoPasado, formatoCantidad, formatoFechaEvento, formatoFechaHora, formatoNumero, hoyISO, mensajeError } from '@/lib/formato'
 import { useSesion } from '@/lib/sesion'
 
 export default function PaginaInicio() {
   const { nombre, puede } = useSesion()
   const verDeposito = puede('deposito.ver')
   const [ingreso, setIngreso] = useState(false)
+  const [nuevoEvento, setNuevoEvento] = useState(false)
+  const router = useRouter()
   const [mensaje, setMensaje] = useState('')
 
   return (
@@ -29,19 +34,26 @@ export default function PaginaInicio() {
         {puede('ingresos.cargar') && (
           <AccesoRapido icono={<IconoIngreso width={24} height={24} />} titulo="Nuevo ingreso" onClick={() => setIngreso(true)} />
         )}
-        <AccesoRapido icono={<IconoEventos width={24} height={24} />} titulo="Nuevo evento" detalle="Disponible en la Fase 2" deshabilitado />
+        {puede('eventos.gestionar') && <AccesoRapido icono={<IconoEventos width={24} height={24} />} titulo="Nuevo evento" onClick={() => setNuevoEvento(true)} />}
         {verDeposito && <AccesoRapido icono={<IconoDeposito width={24} height={24} />} titulo="Ver depósito" href="/deposito" />}
       </div>
 
       {verDeposito && <AlertasMinimo />}
 
-      <section>
-        <h2 className="mb-2 text-lg font-semibold">Últimos eventos</h2>
-        <Tarjeta className="px-4 py-6 text-center text-sm text-suave">Los eventos se suman en la Fase 2.</Tarjeta>
-      </section>
+      <UltimosEventos />
 
       {verDeposito && <UltimosMovimientos />}
 
+      <Ventana abierta={nuevoEvento} alCerrar={() => setNuevoEvento(false)} titulo="Nuevo evento">
+        {nuevoEvento && (
+          <FormEvento
+            alTerminar={(id) => {
+              setNuevoEvento(false)
+              if (id) router.push(`/evento?id=${id}`)
+            }}
+          />
+        )}
+      </Ventana>
       <Ventana abierta={ingreso} alCerrar={() => setIngreso(false)} titulo="Nuevo ingreso">
         {ingreso && <IngresoRapido alTerminar={(m) => { setIngreso(false); if (m) { setMensaje(m); setTimeout(() => setMensaje(''), 4000) } }} />}
       </Ventana>
@@ -165,3 +177,37 @@ function UltimosMovimientos() {
   )
 }
 
+
+function UltimosEventos() {
+  const { data, isPending } = useEventos()
+  const lista = (data ?? []).slice(0, 5)
+  return (
+    <section>
+      <div className="mb-2 flex items-baseline justify-between">
+        <h2 className="text-lg font-semibold">Últimos eventos</h2>
+        <Link href="/eventos" className="text-sm text-marca-700 hover:underline">
+          Ver todos
+        </Link>
+      </div>
+      {isPending ? (
+        <Cargando />
+      ) : lista.length === 0 ? (
+        <Tarjeta className="px-4 py-6 text-center text-sm text-suave">Todavía no hay eventos.</Tarjeta>
+      ) : (
+        <Tarjeta className="divide-y divide-borde">
+          {lista.map((ev) => (
+            <Link key={ev.id} href={`/evento?id=${ev.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-realce">
+              <div className="min-w-0">
+                <p className="truncate font-medium">{ev.nombre}</p>
+                <p className="text-xs text-suave">
+                  {formatoFechaEvento(ev.fecha)} · {formatoNumero(ev.personas)} personas
+                </p>
+              </div>
+              <span className="text-xs text-suave">{ev.fecha === hoyISO() ? 'Hoy' : eventoPasado(ev.fecha) ? '›' : 'Próximo'}</span>
+            </Link>
+          ))}
+        </Tarjeta>
+      )}
+    </section>
+  )
+}

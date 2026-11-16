@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatoCantidad, leerPrecio } from './formato'
+import { formatoCantidad, formatoFechaEvento, leerPrecio } from './formato'
 
 describe('Precios', () => {
   it('entiende el formato argentino', () => {
@@ -22,5 +22,11 @@ describe('Cantidades', () => {
   })
   it('el resto en unidades', () => {
     expect(formatoCantidad(1500)).toBe('1.500 u.')
+  })
+})
+
+describe('Fechas de eventos', () => {
+  it('no se corre un día por la zona horaria', () => {
+    expect(formatoFechaEvento('2026-11-20')).toContain('20')
   })
 })

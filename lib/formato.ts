@@ -50,3 +50,24 @@ export function mensajeError(error: unknown): string {
   if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) return 'No hay conexión. Probá de nuevo en un momento.'
   return msg
 }
+
+/** Fecha de evento ("2026-11-20") sin correrse un día por la zona horaria. */
+function fechaLocal(fecha: string): Date {
+  const [a, m, d] = fecha.split('-').map(Number)
+  return new Date(a, m - 1, d)
+}
+const fechaLarga = new Intl.DateTimeFormat('es-AR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+const soloHora = new Intl.DateTimeFormat('es-AR', { hour: '2-digit', minute: '2-digit' })
+
+/** "sáb, 20 nov 2026" */
+export const formatoFechaEvento = (fecha: string) => fechaLarga.format(fechaLocal(fecha))
+/** "23:45" */
+export const formatoHora = (iso: string) => soloHora.format(new Date(iso))
+
+/** Hoy en formato AAAA-MM-DD (hora local). */
+export function hoyISO(): string {
+  return ahoraParaInput().slice(0, 10)
+}
+
+/** ¿El evento ya pasó? (anterior a hoy) */
+export const eventoPasado = (fecha: string) => fecha < hoyISO()

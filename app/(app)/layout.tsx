@@ -2,22 +2,29 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, type ReactNode, type SVGProps } from 'react'
 import { IconoDeposito, IconoEventos, IconoInicio, IconoMovimientos, Marca } from '@/components/marca'
 import { Boton, Cargando, cx } from '@/components/ui'
 import { useSesion } from '@/lib/sesion'
+import type { Permiso } from '@/lib/tipos'
 
-const secciones = [
+const secciones: {
+  href: string
+  etiqueta: string
+  Icono: (p: SVGProps<SVGSVGElement>) => ReactNode
+  permiso?: Permiso
+  activaEn?: string[]
+}[] = [
   { href: '/', etiqueta: 'Inicio', Icono: IconoInicio },
-  { href: '/deposito', etiqueta: 'Depósito', Icono: IconoDeposito },
-  { href: '/movimientos', etiqueta: 'Movimientos', Icono: IconoMovimientos },
-  { href: '/eventos', etiqueta: 'Eventos', Icono: IconoEventos, proximamente: true },
+  { href: '/eventos', etiqueta: 'Eventos', Icono: IconoEventos, activaEn: ['/evento'] },
+  { href: '/deposito', etiqueta: 'Depósito', Icono: IconoDeposito, permiso: 'deposito.ver' },
+  { href: '/movimientos', etiqueta: 'Movimientos', Icono: IconoMovimientos, permiso: 'deposito.ver' },
 ]
 
 export default function LayoutApp({ children }: { children: ReactNode }) {
   const router = useRouter()
   const ruta = usePathname()
-  const { cargando, session, local, locales, elegirLocal, nombre, salir } = useSesion()
+  const { cargando, session, local, locales, elegirLocal, nombre, salir, puede } = useSesion()
 
   useEffect(() => {
     if (!cargando && !session) router.replace('/login')
@@ -37,7 +44,9 @@ export default function LayoutApp({ children }: { children: ReactNode }) {
     )
   }
 
-  const activa = (href: string) => (href === '/' ? ruta === '/' : ruta.startsWith(href))
+  const visibles = secciones.filter((s) => !s.permiso || puede(s.permiso))
+  const activa = (s: (typeof secciones)[number]) =>
+    s.href === '/' ? ruta === '/' : ruta === s.href || ruta.startsWith(s.href + '/') || !!s.activaEn?.includes(ruta)
 
   return (
     <div className="min-h-dvh md:flex">
@@ -47,8 +56,8 @@ export default function LayoutApp({ children }: { children: ReactNode }) {
           <Marca subtitulo={local.local_nombre} />
         </div>
         <nav className="flex-1 space-y-1 px-3">
-          {secciones.map((s) => (
-            <ItemMenu key={s.href} {...s} activa={activa(s.href)} />
+          {visibles.map((s) => (
+            <ItemMenu key={s.href} href={s.href} etiqueta={s.etiqueta} Icono={s.Icono} activa={activa(s)} />
           ))}
         </nav>
         <PieUsuario nombre={nombre} rol={local.rol} salir={salir} />
@@ -86,17 +95,15 @@ export default function LayoutApp({ children }: { children: ReactNode }) {
       </div>
 
       {/* Menú inferior (celular) */}
-      <nav className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-4 border-t border-borde bg-superficie pb-[env(safe-area-inset-bottom)] md:hidden">
-        {secciones.map((s) => (
+      <nav
+        className="fixed inset-x-0 bottom-0 z-10 grid border-t border-borde bg-superficie pb-[env(safe-area-inset-bottom)] md:hidden"
+        style={{ gridTemplateColumns: `repeat(${visibles.length}, minmax(0, 1fr))` }}
+      >
+        {visibles.map((s) => (
           <Link
             key={s.href}
-            href={s.proximamente ? '#' : s.href}
-            aria-disabled={s.proximamente}
-            className={cx(
-              'flex flex-col items-center gap-0.5 py-2 text-xs',
-              activa(s.href) ? 'font-semibold text-marca-700' : 'text-suave',
-              s.proximamente && 'pointer-events-none opacity-40',
-            )}
+            href={s.href}
+            className={cx('flex flex-col items-center gap-0.5 py-2 text-xs', activa(s) ? 'font-semibold text-marca-700' : 'text-suave')}
           >
             <s.Icono width={22} height={22} />
             {s.etiqueta}
@@ -107,16 +114,12 @@ export default function LayoutApp({ children }: { children: ReactNode }) {
   )
 }
 
-function ItemMenu({ href, etiqueta, Icono, activa, proximamente }: (typeof secciones)[number] & { activa: boolean }) {
-  if (proximamente) {
-    return (
-      <span className="flex items-center gap-3 rounded-lg px-3 py-2 text-suave/60">
-        <Icono />
-        {etiqueta}
-        <span className="ml-auto text-xs">Fase 2</span>
-      </span>
-    )
-  }
+function ItemMenu({
+  href,
+  etiqueta,
+  Icono,
+  activa,
+}: Pick<(typeof secciones)[number], 'href' | 'etiqueta' | 'Icono'> & { activa: boolean }) {
   return (
     <Link
       href={href}

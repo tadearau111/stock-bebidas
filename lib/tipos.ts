@@ -57,3 +57,70 @@ export type Permiso =
   | 'eventos.cargar'
   | 'usuarios.gestionar'
   | 'historial.ver'
+
+// ------------------------------------------------------------------ Eventos
+
+export interface Evento {
+  id: string
+  local_id: string
+  fecha: string // AAAA-MM-DD
+  nombre: string
+  personas: number
+  notas: string | null
+  creado_en: string
+}
+
+export interface Barra {
+  id: string
+  evento_id: string
+  nombre: string
+  orden: number
+}
+
+export interface Reposicion {
+  id: string
+  barra_articulo_id: string
+  tipo: 'detalle' | 'total'
+  cantidad: number
+  hora: string
+  autor?: { nombre: string } | null
+}
+
+export interface LineaBarraDB {
+  id: string
+  barra_id: string
+  articulo_id: string
+  stock_inicial: number
+  stock_final: number | null
+  articulo: { nombre: string; unidad: Unidad; marca: string | null; tamano: string | null }
+  reposiciones: Reposicion[]
+}
+
+export interface RetiroDB {
+  id: string
+  barra_id: string
+  articulo_id: string
+  tipo: 'personal' | 'cortesia'
+  cantidad: number
+  retirado_por: string
+  hora: string
+  articulo?: { nombre: string; unidad: Unidad } | null
+  autor?: { nombre: string } | null
+}
+
+export interface BebidaAbiertaDB {
+  id: string
+  articulo_id: string
+  cuartos: number
+  hora: string
+  articulo?: { nombre: string } | null
+  autor?: { nombre: string } | null
+}
+
+export interface DetalleEvento {
+  evento: Evento
+  barras: Barra[]
+  lineas: LineaBarraDB[]
+  retiros: RetiroDB[]
+  bebidaAbierta: BebidaAbiertaDB[]
+}
