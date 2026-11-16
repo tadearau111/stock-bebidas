@@ -199,3 +199,94 @@ export function resumirEvento(
     totales: { retirosPersonal: personal, cortesias, costo: costoTotal, facturacion: facturacionTotal },
   }
 }
+
+// ------------------------------------------------------------------ Costos por barra
+
+export interface LineaConBarra extends LineaBarra {
+  barra_id: string
+}
+
+export interface RetiroConBarra extends Retiro {
+  barra_id: string
+}
+
+export interface FilaCosto {
+  articulo: ArticuloPrecio
+  consumido: number
+  retiros: number // personal + cortesías (no se venden)
+  vendido: number // consumido − retiros
+  pendiente: boolean // falta el stock final
+  totalCosto: number | null // consumido × precio de costo
+  totalVenta: number | null // vendido × precio de venta
+}
+
+export interface CostosBarra {
+  barra_id: string
+  filas: FilaCosto[]
+  totalCosto: number
+  totalVenta: number
+}
+
+export interface CostosEvento {
+  barras: CostosBarra[]
+  totalCosto: number
+  totalVenta: number
+  diferencia: number // venta − costo
+  sinPrecioCosto: string[] // nombres de artículos consumidos sin precio de costo
+  sinPrecioVenta: string[]
+  lineasPendientes: number
+}
+
+/**
+ * Costo = lo consumido en la barra × precio de costo (todo lo que salió cuesta,
+ * también lo del personal y las cortesías).
+ * Venta = lo vendido (consumido − retiros) × precio de venta.
+ * Ejemplo: 10 cocas a $1 de costo y $2 de venta → costo $10, venta $20.
+ */
+export function costosDelEvento(
+  barras: { id: string }[],
+  lineas: LineaConBarra[],
+  retiros: RetiroConBarra[],
+  articulos: ArticuloPrecio[],
+): CostosEvento {
+  const porId = new Map(articulos.map((a) => [a.id, a]))
+  const sinCosto = new Set<string>()
+  const sinVenta = new Set<string>()
+  let totalCosto = 0
+  let totalVenta = 0
+
+  const resultado = barras.map((b) => {
+    const filas: FilaCosto[] = lineas
+      .filter((l) => l.barra_id === b.id)
+      .map((l) => {
+        const articulo = porId.get(l.articulo_id) ?? { id: l.articulo_id, nombre: '¿?', unidad: 'unidad' as const, precio_costo: null, precio_venta: null }
+        const c = consumido(l)
+        const cons = c ?? 0
+        const ret = retiros
+          .filter((r) => r.barra_id === b.id && r.articulo_id === l.articulo_id)
+          .reduce((t, r) => t + r.cantidad, 0)
+        const vendido = Math.max(cons - ret, 0)
+        const totalCostoFila = articulo.precio_costo == null ? null : cons * articulo.precio_costo
+        const totalVentaFila = articulo.precio_venta == null ? null : vendido * articulo.precio_venta
+        if (cons > 0 && articulo.precio_costo == null) sinCosto.add(articulo.nombre)
+        if (vendido > 0 && articulo.precio_venta == null) sinVenta.add(articulo.nombre)
+        return { articulo, consumido: cons, retiros: ret, vendido, pendiente: c == null, totalCosto: totalCostoFila, totalVenta: totalVentaFila }
+      })
+      .sort((x, y) => x.articulo.nombre.localeCompare(y.articulo.nombre, 'es'))
+    const tc = filas.reduce((t, f) => t + (f.totalCosto ?? 0), 0)
+    const tv = filas.reduce((t, f) => t + (f.totalVenta ?? 0), 0)
+    totalCosto += tc
+    totalVenta += tv
+    return { barra_id: b.id, filas, totalCosto: tc, totalVenta: tv }
+  })
+
+  return {
+    barras: resultado,
+    totalCosto,
+    totalVenta,
+    diferencia: totalVenta - totalCosto,
+    sinPrecioCosto: [...sinCosto].sort(),
+    sinPrecioVenta: [...sinVenta].sort(),
+    lineasPendientes: lineas.filter((l) => l.stock_final == null).length,
+  }
+}

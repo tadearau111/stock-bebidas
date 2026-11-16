@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   bebidaAbiertaPorArticulo,
+  costosDelEvento,
   consumido,
   faltaEnDeposito,
   formatoBotellas,
@@ -188,5 +189,58 @@ describe('Resumen del evento', () => {
     const r = resumirEvento([linea(10, [], 5, 'hielo')], [], articulos, 10)
     expect(r.totales.costo).toBeNull()
     expect(r.totales.facturacion).toBeNull()
+  })
+})
+
+describe('Costos del evento', () => {
+  const coca = { id: 'coca', nombre: 'Coca Cola', unidad: 'unidad' as const, precio_costo: 1, precio_venta: 2 }
+  const fernet = { id: 'fernet', nombre: 'Fernet', unidad: 'unidad' as const, precio_costo: 10, precio_venta: 30 }
+  const hielo = { id: 'hielo', nombre: 'Hielo', unidad: 'bolsa' as const, precio_costo: null, precio_venta: null }
+  const enBarra = (barra_id: string, l: LineaBarra) => ({ ...l, barra_id })
+
+  it('ejemplo: 10 cocas a $1 de costo y $2 de venta → costo $10 y venta $20', () => {
+    const r = costosDelEvento([{ id: 'b1' }], [enBarra('b1', linea(12, [], 2, 'coca'))], [], [coca])
+    expect(r.totalCosto).toBe(10)
+    expect(r.totalVenta).toBe(20)
+    expect(r.diferencia).toBe(10)
+  })
+
+  it('suma todas las barras y muestra el total de cada una', () => {
+    const r = costosDelEvento(
+      [{ id: 'b1' }, { id: 'vip' }],
+      [enBarra('b1', linea(12, [], 2, 'coca')), enBarra('vip', linea(5, [], 0, 'coca')), enBarra('vip', linea(3, [], 1, 'fernet'))],
+      [],
+      [coca, fernet],
+    )
+    expect(r.barras[0].totalCosto).toBe(10)
+    expect(r.barras[1].totalCosto).toBe(5 + 20)
+    expect(r.barras[1].totalVenta).toBe(10 + 60)
+    expect(r.totalCosto).toBe(35)
+    expect(r.totalVenta).toBe(90)
+  })
+
+  it('lo retirado (personal y cortesías) cuesta pero no se vende', () => {
+    const r = costosDelEvento(
+      [{ id: 'b1' }],
+      [enBarra('b1', linea(12, [], 2, 'coca'))],
+      [{ barra_id: 'b1', articulo_id: 'coca', tipo: 'personal', cantidad: 2 }],
+      [coca],
+    )
+    expect(r.totalCosto).toBe(10) // 10 consumidas
+    expect(r.totalVenta).toBe(16) // 8 vendidas
+  })
+
+  it('avisa los artículos sin precio y no los suma', () => {
+    const r = costosDelEvento([{ id: 'b1' }], [enBarra('b1', linea(10, [], 4, 'hielo')), enBarra('b1', linea(12, [], 2, 'coca'))], [], [coca, hielo])
+    expect(r.totalCosto).toBe(10)
+    expect(r.sinPrecioCosto).toEqual(['Hielo'])
+    expect(r.sinPrecioVenta).toEqual(['Hielo'])
+  })
+
+  it('sin stock final no se cuenta y se avisa', () => {
+    const r = costosDelEvento([{ id: 'b1' }], [enBarra('b1', linea(12, [], null, 'coca'))], [], [coca])
+    expect(r.totalCosto).toBe(0)
+    expect(r.lineasPendientes).toBe(1)
+    expect(r.barras[0].filas[0].pendiente).toBe(true)
   })
 })

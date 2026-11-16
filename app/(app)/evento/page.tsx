@@ -6,6 +6,7 @@ import { Fragment, Suspense, useState } from 'react'
 import { FormEvento } from '@/components/eventos/FormEvento'
 import { PestanaBarra } from '@/components/eventos/PestanaBarra'
 import { PestanaBebidaAbierta } from '@/components/eventos/PestanaBebidaAbierta'
+import { PestanaCostos } from '@/components/eventos/PestanaCostos'
 import { PestanaResumen } from '@/components/eventos/PestanaResumen'
 import { Aviso, Boton, Cargando, Ventana, cx } from '@/components/ui'
 import { ejecutar, useBorrarEvento, useCambioEvento, useEvento } from '@/lib/eventos'
@@ -51,7 +52,10 @@ function Evento() {
 
   const { evento, barras } = detalle
   const barraActiva = barras.find((b) => b.id === pestana)
-  const actual = barraActiva ? barraActiva.id : pestana === 'abierta' || pestana === 'resumen' ? pestana : (barras[0]?.id ?? 'resumen')
+  // La pestaña Costos la ve quien gestiona eventos (los encargados de la noche no ven precios ahí)
+  const verCostos = puede('eventos.gestionar')
+  const fijas = ['abierta', 'resumen', ...(verCostos ? ['costos'] : [])]
+  const actual = barraActiva ? barraActiva.id : fijas.includes(pestana) ? pestana : (barras[0]?.id ?? 'resumen')
   const barraMostrada = barras.find((b) => b.id === actual)
 
   async function agregarBarra() {
@@ -81,6 +85,7 @@ function Evento() {
     ...barras.map((b) => ({ id: b.id, nombre: b.nombre })),
     { id: 'abierta', nombre: 'Bebida abierta' },
     { id: 'resumen', nombre: 'Resumen' },
+    ...(verCostos ? [{ id: 'costos', nombre: 'Costos' }] : []),
   ]
 
   return (
@@ -145,7 +150,7 @@ function Evento() {
       ) : actual === 'abierta' ? (
         <PestanaBebidaAbierta detalle={detalle} />
       ) : (
-        <PestanaResumen detalle={detalle} />
+        actual === 'costos' ? <PestanaCostos detalle={detalle} /> : <PestanaResumen detalle={detalle} />
       )}
 
       <Ventana abierta={editando} alCerrar={() => setEditando(false)} titulo="Editar evento">
