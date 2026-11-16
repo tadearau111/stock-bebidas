@@ -40,6 +40,8 @@ Vas a necesitar tres cuentas gratis: **GitHub**, **Supabase** y **Vercel**.
    | `NEXT_PUBLIC_SUPABASE_URL` | la Project URL del paso 1.8 |
    | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | la Publishable key del paso 1.8 |
 
+   - Si Vercel pregunta el tipo de variable, elegí **Config** (no "Secret"): estas dos claves están hechas para ser públicas.
+   - Si aparece "Optional Integrations → Supabase → Add", **no lo toques** (crearía otra base de datos).
 4. Tocá **Deploy**. En 1 o 2 minutos te da un link del tipo `stock-bebidas.vercel.app`.
 5. Volvé a Supabase. Entrá a **Authentication**, después a **URL Configuration**, y en **Site URL** pegá ese link.
 
