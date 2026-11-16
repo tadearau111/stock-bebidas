@@ -1,0 +1,346 @@
+// Arma los reportes (depósito, faltantes, resumen de evento) en un formato
+// común que después se convierte a Excel, PDF o texto para WhatsApp.
+
+import {
+  bebidaAbiertaPorArticulo,
+  consumido,
+  costosDelEvento,
+  formatoBotellas,
+  resumirEvento,
+  soloBotellas,
+  totalReposiciones,
+  tragosRetirados,
+  type ArticuloPrecio,
+} from '../calculos/evento'
+import type { Articulo, DetalleEvento } from '../tipos'
+
+export type Celda = string | number | null
+
+export interface Columna {
+  titulo: string
+  tipo?: 'texto' | 'numero' | 'pesos'
+}
+
+export interface Seccion {
+  titulo: string
+  columnas: Columna[]
+  filas: Celda[][]
+  total?: Celda[]
+  /** índices de filas que van en rojo (ej: bajo mínimo) */
+  resaltar?: number[]
+  nota?: string
+}
+
+export interface Reporte {
+  titulo: string
+  subtitulo: string
+  /** datos clave arriba de todo: [["Personas", "120"], ...] */
+  datos: [string, string][]
+  secciones: Seccion[]
+  textoWhatsApp: string
+  nombreArchivo: string // sin extensión
+}
+
+// ------------------------------------------------------------------ Formatos
+
+const numero = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 })
+const pesos = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 })
+const fechaLarga = new Intl.DateTimeFormat('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+const fechaHora = new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+/** Texto de una celda según su tipo (para PDF y WhatsApp). Los espacios raros se normalizan. */
+export function textoCelda(valor: Celda, tipo: Columna['tipo'] = 'texto'): string {
+  if (valor == null || valor === '') return '—'
+  if (typeof valor === 'number') {
+    const t = tipo === 'pesos' ? pesos.format(valor) : numero.format(valor)
+    return t.replace(/ | /g, ' ')
+  }
+  return valor
+}
+
+export function slug(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function fechaEvento(fecha: string) {
+  const [a, m, d] = fecha.split('-').map(Number)
+  return fechaLarga.format(new Date(a, m - 1, d))
+}
+
+const unidadTexto = (u: 'unidad' | 'bolsa', n: number) => (u === 'bolsa' ? (n === 1 ? 'bolsa' : 'bolsas') : 'u.')
+
+// ------------------------------------------------------------------ Depósito
+
+export function reporteDeposito(articulos: Articulo[], local: string, ahora = new Date()): Reporte {
+  const activos = articulos.filter((a) => a.activo).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+  const bajos = activos.filter((a) => a.bajo_minimo)
+  const hayPrecios = activos.some((a) => a.precio_costo != null || a.precio_venta != null)
+  const columnas: Columna[] = [
+    { titulo: 'Nombre' },
+    { titulo: 'Marca' },
+    { titulo: 'Tamaño' },
+    { titulo: 'Stock actual', tipo: 'numero' },
+    { titulo: 'Stock mínimo', tipo: 'numero' },
+    ...(hayPrecios ? [{ titulo: 'Precio costo', tipo: 'pesos' as const }, { titulo: 'Precio venta', tipo: 'pesos' as const }] : []),
+  ]
+  const filas = activos.map((a) => [
+    a.nombre,
+    a.marca,
+    a.tamano,
+    a.stock_actual,
+    a.stock_minimo,
+    ...(hayPrecios ? [a.precio_costo, a.precio_venta] : []),
+  ])
+  const valorizado = activos.reduce((t, a) => t + (a.precio_costo != null ? Math.max(a.stock_actual, 0) * a.precio_costo : 0), 0)
+
+  return {
+    titulo: 'Stock del depósito',
+    subtitulo: `${local} · ${fechaHora.format(ahora)}`,
+    datos: [
+      ['Artículos', numero.format(activos.length)],
+      ['Por debajo del mínimo', numero.format(bajos.length)],
+      ...(hayPrecios ? ([['Stock valorizado a costo', textoCelda(valorizado, 'pesos')]] as [string, string][]) : []),
+    ],
+    secciones: [
+      {
+        titulo: 'Artículos',
+        columnas,
+        filas,
+        resaltar: activos.map((a, i) => (a.bajo_minimo ? i : -1)).filter((i) => i >= 0),
+        nota: bajos.length ? 'En rojo: por debajo del stock mínimo.' : undefined,
+      },
+    ],
+    textoWhatsApp: [
+      `*Stock del depósito* — ${local}`,
+      fechaHora.format(ahora).replace(/ | /g, ' '),
+      '',
+      ...activos.map((a) => `${a.bajo_minimo ? '🔴 ' : ''}${a.nombre}: ${numero.format(a.stock_actual)} ${unidadTexto(a.unidad, a.stock_actual)}`),
+    ].join('\n'),
+    nombreArchivo: `deposito-${ahora.toISOString().slice(0, 10)}`,
+  }
+}
+
+// ------------------------------------------------------------------ Faltantes
+
+export function reporteFaltantes(articulos: Articulo[], local: string, ahora = new Date()): Reporte {
+  const bajos = articulos
+    .filter((a) => a.activo && a.bajo_minimo)
+    .sort((a, b) => b.faltante - a.faltante || a.nombre.localeCompare(b.nombre, 'es'))
+  const hayCosto = bajos.some((a) => a.precio_costo != null)
+  const estimado = bajos.reduce((t, a) => t + (a.precio_costo != null ? a.faltante * a.precio_costo : 0), 0)
+
+  return {
+    titulo: 'Lista de faltantes',
+    subtitulo: `${local} · ${fechaHora.format(ahora)}`,
+    datos: [
+      ['Artículos a comprar', numero.format(bajos.length)],
+      ...(hayCosto ? ([['Costo estimado de la compra', textoCelda(estimado, 'pesos')]] as [string, string][]) : []),
+    ],
+    secciones: [
+      {
+        titulo: 'Qué comprar',
+        columnas: [
+          { titulo: 'Artículo' },
+          { titulo: 'Marca' },
+          { titulo: 'Tamaño' },
+          { titulo: 'Hay', tipo: 'numero' },
+          { titulo: 'Mínimo', tipo: 'numero' },
+          { titulo: 'Comprar', tipo: 'numero' },
+          ...(hayCosto ? [{ titulo: 'Costo estimado', tipo: 'pesos' as const }] : []),
+        ],
+        filas: bajos.map((a) => [
+          a.nombre,
+          a.marca,
+          a.tamano,
+          a.stock_actual,
+          a.stock_minimo,
+          a.faltante,
+          ...(hayCosto ? [a.precio_costo != null ? a.faltante * a.precio_costo : null] : []),
+        ]),
+        nota: bajos.length === 0 ? 'No hay artículos por debajo del mínimo.' : '"Comprar" es lo que falta para llegar al stock mínimo.',
+      },
+    ],
+    textoWhatsApp:
+      bajos.length === 0
+        ? `*Lista de faltantes* — ${local}\nNo hay artículos por debajo del mínimo. ✅`
+        : [
+            `*Lista de faltantes* — ${local}`,
+            '',
+            ...bajos.map((a) => `• ${a.nombre}: comprar *${numero.format(a.faltante)}* ${unidadTexto(a.unidad, a.faltante)} (hay ${numero.format(a.stock_actual)})`),
+          ].join('\n'),
+    nombreArchivo: `faltantes-${ahora.toISOString().slice(0, 10)}`,
+  }
+}
+
+// ------------------------------------------------------------------ Resumen de evento
+
+export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[], opciones: { incluirCostos: boolean }): Reporte {
+  const { evento, barras, lineas, retiros, bebidaAbierta } = detalle
+  const precios = [...articulos]
+  for (const l of lineas) {
+    if (!precios.some((p) => p.id === l.articulo_id)) {
+      precios.push({ id: l.articulo_id, nombre: l.articulo.nombre, unidad: l.articulo.unidad, precio_costo: null, precio_venta: null })
+    }
+  }
+  const lineasCalc = lineas.map((l) => ({
+    barra_id: l.barra_id,
+    articulo_id: l.articulo_id,
+    stock_inicial: l.stock_inicial,
+    stock_final: l.stock_final,
+    reposiciones: l.reposiciones,
+  }))
+  const botellas = soloBotellas(retiros)
+  const resumen = resumirEvento(lineasCalc, botellas, precios, evento.personas)
+  const costos = costosDelEvento(barras, lineasCalc, botellas, precios)
+  const tragos = tragosRetirados(retiros)
+  const abierta = bebidaAbiertaPorArticulo(bebidaAbierta)
+  const nombreAbierta = (id: string) => bebidaAbierta.find((b) => b.articulo_id === id)?.articulo?.nombre ?? '¿?'
+  const nombreBarra = (id: string) => barras.find((b) => b.id === id)?.nombre ?? 'Barra'
+
+  const secciones: Seccion[] = []
+
+  secciones.push({
+    titulo: 'Consumo total por artículo',
+    columnas: [
+      { titulo: 'Artículo' },
+      { titulo: 'Consumido', tipo: 'numero' },
+      { titulo: 'Personal', tipo: 'numero' },
+      { titulo: 'Cortesías', tipo: 'numero' },
+      { titulo: 'Venta estimada', tipo: 'numero' },
+      { titulo: 'Por persona', tipo: 'numero' },
+    ],
+    filas: resumen.filas.map((f) => [
+      f.articulo.nombre + (f.pendiente ? ' (falta final)' : ''),
+      f.consumido,
+      f.retirosPersonal,
+      f.cortesias,
+      f.ventaEstimada,
+      f.porPersona == null ? null : Math.round(f.porPersona * 100) / 100,
+    ]),
+    resaltar: resumen.filas.map((f, i) => (f.pendiente || f.ventaEstimada < 0 ? i : -1)).filter((i) => i >= 0),
+    nota:
+      resumen.barrasSinFinal > 0
+        ? `Falta cargar el stock final en ${resumen.barrasSinFinal} artículo(s): no se cuentan en el consumo.`
+        : 'Venta estimada = Consumido - Retiros de personal - Cortesías.',
+  })
+
+  for (const b of barras) {
+    const ls = lineas.filter((l) => l.barra_id === b.id)
+    secciones.push({
+      titulo: b.nombre,
+      columnas: [
+        { titulo: 'Artículo' },
+        { titulo: 'Stock inicial', tipo: 'numero' },
+        { titulo: 'Reposiciones', tipo: 'numero' },
+        { titulo: 'Stock final', tipo: 'numero' },
+        { titulo: 'Consumido', tipo: 'numero' },
+      ],
+      filas: ls.map((l) => [l.articulo.nombre, l.stock_inicial, totalReposiciones(l), l.stock_final, consumido(l)]),
+      nota: ls.length === 0 ? 'Sin artículos.' : undefined,
+    })
+  }
+
+  if (retiros.length > 0) {
+    secciones.push({
+      titulo: 'Retiros',
+      columnas: [{ titulo: 'Barra' }, { titulo: 'Tipo' }, { titulo: 'Qué' }, { titulo: 'Cantidad', tipo: 'numero' }, { titulo: 'Retiró' }, { titulo: 'Hora' }],
+      filas: [...retiros]
+        .sort((a, b) => a.hora.localeCompare(b.hora))
+        .map((r) => [
+          nombreBarra(r.barra_id),
+          r.tipo === 'personal' ? 'Personal' : 'Cortesía',
+          (r.articulo?.nombre ?? r.trago?.nombre ?? '¿?') + (r.trago_id ? ' (vasos)' : ''),
+          r.cantidad,
+          r.retirado_por,
+          fechaHora.format(new Date(r.hora)).replace(/ | /g, ' '),
+        ]),
+    })
+  }
+
+  if (tragos.length > 0) {
+    secciones.push({
+      titulo: 'Tragos y vasos retirados',
+      columnas: [{ titulo: 'Trago / vaso' }, { titulo: 'Personal', tipo: 'numero' }, { titulo: 'Cortesía', tipo: 'numero' }, { titulo: 'Total vasos', tipo: 'numero' }],
+      filas: tragos.map((t) => [t.nombre, t.personal, t.cortesia, t.vasos]),
+      nota: 'Informativo: salen de las botellas de las barras.',
+    })
+  }
+
+  if (abierta.size > 0) {
+    secciones.push({
+      titulo: 'Bebida abierta',
+      columnas: [{ titulo: 'Artículo' }, { titulo: 'Botellas' }],
+      filas: [...abierta.entries()]
+        .sort((a, b) => nombreAbierta(a[0]).localeCompare(nombreAbierta(b[0]), 'es'))
+        .map(([id, n]) => [nombreAbierta(id), formatoBotellas(n)]),
+      nota: 'Solo informativa: no sale del depósito.',
+    })
+  }
+
+  if (opciones.incluirCostos) {
+    secciones.push({
+      titulo: 'Costos',
+      columnas: [
+        { titulo: 'Barra' },
+        { titulo: 'Artículo' },
+        { titulo: 'Consumido', tipo: 'numero' },
+        { titulo: 'Precio costo', tipo: 'pesos' },
+        { titulo: 'Total costo', tipo: 'pesos' },
+        { titulo: 'Vendido', tipo: 'numero' },
+        { titulo: 'Precio venta', tipo: 'pesos' },
+        { titulo: 'Total venta', tipo: 'pesos' },
+      ],
+      filas: costos.barras.flatMap((b) =>
+        b.filas.map((f) => [nombreBarra(b.barra_id), f.articulo.nombre, f.consumido, f.articulo.precio_costo, f.totalCosto, f.vendido, f.articulo.precio_venta, f.totalVenta]),
+      ),
+      total: ['Total', null, null, null, costos.totalCosto, null, null, costos.totalVenta],
+      nota: 'Costo = consumido x precio de costo. Venta = vendido (consumido - retiros) x precio de venta.',
+    })
+  }
+
+  const datos: [string, string][] = [
+    ['Fecha', fechaEvento(evento.fecha)],
+    ['Personas', numero.format(evento.personas)],
+    ['Barras', numero.format(barras.length)],
+    ['Retiros de personal', numero.format(resumen.totales.retirosPersonal)],
+    ['Cortesías', numero.format(resumen.totales.cortesias)],
+  ]
+  if (opciones.incluirCostos) {
+    datos.push(['Total precio costo', textoCelda(costos.totalCosto, 'pesos')], ['Total precio venta', textoCelda(costos.totalVenta, 'pesos')])
+  }
+
+  const lineasWa = [
+    `*${evento.nombre}*`,
+    `${fechaEvento(evento.fecha)} · ${numero.format(evento.personas)} personas`,
+    '',
+    '*Consumo total*',
+    ...resumen.filas.map(
+      (f) =>
+        `• ${f.articulo.nombre}: ${numero.format(f.consumido)} ${unidadTexto(f.articulo.unidad, f.consumido)}` +
+        (f.retirosPersonal + f.cortesias > 0 ? ` (venta ${numero.format(f.ventaEstimada)})` : '') +
+        (f.pendiente ? ' ⚠ falta final' : ''),
+    ),
+  ]
+  if (resumen.totales.retirosPersonal || resumen.totales.cortesias) {
+    lineasWa.push('', `Retiros personal: ${numero.format(resumen.totales.retirosPersonal)} · Cortesías: ${numero.format(resumen.totales.cortesias)}`)
+  }
+  if (tragos.length) lineasWa.push(`Tragos/vasos retirados: ${numero.format(tragos.reduce((t, x) => t + x.vasos, 0))}`)
+  if (abierta.size) lineasWa.push(`Bebida abierta: ${[...abierta.entries()].map(([id, n]) => `${nombreAbierta(id)} ${formatoBotellas(n)}`).join(', ')}`)
+  if (opciones.incluirCostos) {
+    lineasWa.push('', `*Total costo:* ${textoCelda(costos.totalCosto, 'pesos')}`, `*Total venta:* ${textoCelda(costos.totalVenta, 'pesos')}`)
+  }
+
+  return {
+    titulo: evento.nombre,
+    subtitulo: `Resumen del evento · ${fechaEvento(evento.fecha)}`,
+    datos,
+    secciones,
+    textoWhatsApp: lineasWa.join('\n'),
+    nombreArchivo: `evento-${slug(evento.nombre)}-${evento.fecha}`,
+  }
+}

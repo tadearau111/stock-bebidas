@@ -12,7 +12,7 @@ Plataforma web para manejar el stock de bebidas del depósito y el control de ca
 | 1 | Login, artículos, depósito con ingresos y ajustes, alertas de mínimo | ✅ |
 | 2 | Eventos, barras, reposiciones, stock final, retiros, bebida abierta, resumen | ✅ |
 | 3 | Usuarios, roles y permisos configurables, historial | ✅ |
-| 4 | Exportar a Excel y PDF, compartir por WhatsApp | Pendiente |
+| 4 | Exportar a Excel y PDF, compartir por WhatsApp | ✅ |
 | 5 | App instalable y funcionamiento sin conexión | Pendiente |
 
 ## Técnico

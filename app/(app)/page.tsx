@@ -5,6 +5,8 @@ import { useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { FormIngreso } from '@/components/deposito/formularios'
 import { FormEvento } from '@/components/eventos/FormEvento'
+import { BotonesExportar } from '@/components/Exportar'
+import { reporteFaltantes } from '@/lib/exportar/reportes'
 import { IconoCarrito, IconoDeposito, IconoEventos, IconoIngreso } from '@/components/marca'
 import { Aviso, Cargando, Tarjeta, Ventana, cx } from '@/components/ui'
 import { useArticulos, useMovimientos } from '@/lib/datos'
@@ -103,6 +105,7 @@ function AccesoRapido({
 
 function AlertasMinimo() {
   const { data, isPending, error } = useArticulos()
+  const { local } = useSesion()
   const bajos = (data ?? []).filter((a) => a.activo && a.bajo_minimo).sort((a, b) => b.faltante - a.faltante)
   const sinMinimo = (data ?? []).filter((a) => a.activo && a.stock_minimo === 0).length
 
@@ -128,6 +131,9 @@ function AlertasMinimo() {
         </Tarjeta>
       ) : (
         <Tarjeta className="divide-y divide-borde border-alerta/40">
+          <div className="px-4 py-3">
+            <BotonesExportar compacto crear={() => (data ? reporteFaltantes(data, local?.local_nombre ?? '') : null)} />
+          </div>
           {bajos.map((a) => (
             <div key={a.id} className="flex items-center justify-between px-4 py-3">
               <div>

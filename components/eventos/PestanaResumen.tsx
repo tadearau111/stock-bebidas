@@ -3,12 +3,16 @@
 import { useMemo } from 'react'
 import { Aviso, Tarjeta, cx } from '@/components/ui'
 import { bebidaAbiertaPorArticulo, formatoBotellas, resumirEvento, soloBotellas, sumarFracciones, tragosRetirados } from '@/lib/calculos/evento'
+import { BotonesExportar } from '@/components/Exportar'
 import { useArticulos } from '@/lib/datos'
+import { reporteEvento } from '@/lib/exportar/reportes'
+import { useSesion } from '@/lib/sesion'
 import { formatoCantidad, formatoNumero, formatoPesos, formatoVasos } from '@/lib/formato'
 import type { DetalleEvento } from '@/lib/tipos'
 
 export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
   const { data: articulos } = useArticulos()
+  const { puede } = useSesion()
   const { evento, lineas, retiros, bebidaAbierta, barras } = detalle
 
   const resumen = useMemo(() => {
@@ -41,7 +45,19 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
 
   return (
     <div className="space-y-5">
-      <h2 className="text-xl font-semibold">Resumen del evento</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-xl font-semibold">Resumen del evento</h2>
+        <BotonesExportar
+          compacto
+          crear={() =>
+            reporteEvento(
+              detalle,
+              (articulos ?? []).map((a) => ({ id: a.id, nombre: a.nombre, unidad: a.unidad, precio_costo: a.precio_costo, precio_venta: a.precio_venta })),
+              { incluirCostos: puede('eventos.gestionar') },
+            )
+          }
+        />
+      </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Dato titulo="Personas" valor={formatoNumero(evento.personas)} />

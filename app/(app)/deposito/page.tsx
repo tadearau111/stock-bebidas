@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { FormAjuste, FormArticulo, FormIngreso } from '@/components/deposito/formularios'
 import { ListaTragos } from '@/components/deposito/Tragos'
+import { BotonesExportar } from '@/components/Exportar'
+import { reporteDeposito, reporteFaltantes } from '@/lib/exportar/reportes'
 import { IconoBuscar } from '@/components/marca'
 import { Aviso, Boton, Cargando, Etiqueta, Tarjeta, Ventana, cx } from '@/components/ui'
 import { coincideBusqueda } from '@/lib/calculos/stock'
@@ -29,6 +31,8 @@ export default function PaginaDeposito() {
   const [filtro, setFiltro] = useState<Filtro>('activos')
   const [accion, setAccion] = useState<Accion>(null)
   const [mensaje, setMensaje] = useState('')
+  const [exportando, setExportando] = useState(false)
+  const { local } = useSesion()
 
   const lista = useMemo(() => {
     return (articulos ?? [])
@@ -53,7 +57,10 @@ export default function PaginaDeposito() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Depósito</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Boton variante="secundario" onClick={() => setExportando((v) => !v)}>
+            Exportar
+          </Boton>
           {puede('articulos.editar') && (
             <Boton variante="secundario" onClick={() => setAccion({ tipo: 'tragos' })}>
               Tragos
@@ -69,6 +76,21 @@ export default function PaginaDeposito() {
       </div>
 
       {mensaje && <Aviso tipo="ok">✓ {mensaje}</Aviso>}
+
+      {exportando && (
+        <Tarjeta className="grid gap-4 p-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <p className="font-semibold">Stock del depósito</p>
+            <p className="text-xs text-suave">Todos los artículos activos con su stock, mínimo y precios.</p>
+            <BotonesExportar crear={() => (articulos ? reporteDeposito(articulos, local?.local_nombre ?? '') : null)} />
+          </div>
+          <div className="space-y-2">
+            <p className="font-semibold">Lista de faltantes</p>
+            <p className="text-xs text-suave">Lo que está por debajo del mínimo y cuánto comprar ({cantidadBajo}).</p>
+            <BotonesExportar crear={() => (articulos ? reporteFaltantes(articulos, local?.local_nombre ?? '') : null)} />
+          </div>
+        </Tarjeta>
+      )}
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
