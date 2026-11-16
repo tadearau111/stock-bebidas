@@ -99,13 +99,23 @@ export interface LineaBarraDB {
 export interface RetiroDB {
   id: string
   barra_id: string
-  articulo_id: string
+  articulo_id: string | null // botella de la barra…
+  trago_id: string | null // …o un trago/vaso (solo cortesías)
   tipo: 'personal' | 'cortesia'
   cantidad: number
   retirado_por: string
   hora: string
   articulo?: { nombre: string; unidad: Unidad } | null
+  trago?: { nombre: string } | null
   autor?: { nombre: string } | null
+}
+
+/** Trago o vaso que se puede dar de cortesía (se cuenta en vasos). */
+export interface Trago {
+  id: string
+  local_id: string
+  nombre: string
+  activo: boolean
 }
 
 export interface BebidaAbiertaDB {

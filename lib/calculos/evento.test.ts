@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   bebidaAbiertaPorArticulo,
   costosDelEvento,
+  soloBotellas,
+  tragosDeCortesia,
   consumido,
   faltaEnDeposito,
   formatoBotellas,
@@ -242,5 +244,26 @@ describe('Costos del evento', () => {
     expect(r.totalCosto).toBe(0)
     expect(r.lineasPendientes).toBe(1)
     expect(r.barras[0].filas[0].pendiente).toBe(true)
+  })
+})
+
+describe('Tragos y vasos de cortesía', () => {
+  const retiros = [
+    { articulo_id: 'coca', trago_id: null, tipo: 'cortesia' as const, cantidad: 2 },
+    { articulo_id: null, trago_id: 't1', tipo: 'cortesia' as const, cantidad: 3, trago: { nombre: 'Trago Absolut' } },
+    { articulo_id: null, trago_id: 't1', tipo: 'cortesia' as const, cantidad: 2, trago: { nombre: 'Trago Absolut' } },
+    { articulo_id: null, trago_id: 't2', tipo: 'cortesia' as const, cantidad: 1, trago: { nombre: 'Vaso gaseosa' } },
+  ]
+  it('suma los vasos por trago', () => {
+    expect(tragosDeCortesia(retiros)).toEqual([
+      { nombre: 'Trago Absolut', vasos: 5 },
+      { nombre: 'Vaso gaseosa', vasos: 1 },
+    ])
+  })
+  it('los tragos no cuentan como botellas en el resumen ni descuentan venta', () => {
+    const r = resumirEvento([linea(12, [], 2, 'coca')], soloBotellas(retiros), [], 10)
+    expect(r.filas[0].cortesias).toBe(2)
+    expect(r.filas[0].ventaEstimada).toBe(8)
+    expect(r.filas).toHaveLength(1)
   })
 })

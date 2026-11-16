@@ -2,9 +2,9 @@
 
 import { useMemo } from 'react'
 import { Aviso, Tarjeta, cx } from '@/components/ui'
-import { bebidaAbiertaPorArticulo, formatoBotellas, resumirEvento, sumarFracciones } from '@/lib/calculos/evento'
+import { bebidaAbiertaPorArticulo, formatoBotellas, resumirEvento, soloBotellas, sumarFracciones, tragosDeCortesia } from '@/lib/calculos/evento'
 import { useArticulos } from '@/lib/datos'
-import { formatoCantidad, formatoNumero, formatoPesos } from '@/lib/formato'
+import { formatoCantidad, formatoNumero, formatoPesos, formatoVasos } from '@/lib/formato'
 import type { DetalleEvento } from '@/lib/tipos'
 
 export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
@@ -27,13 +27,14 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
     }
     return resumirEvento(
       lineas.map((l) => ({ articulo_id: l.articulo_id, stock_inicial: l.stock_inicial, stock_final: l.stock_final, reposiciones: l.reposiciones })),
-      retiros,
+      soloBotellas(retiros),
       precios,
       evento.personas,
     )
   }, [articulos, lineas, retiros, evento.personas])
 
   const abierta = useMemo(() => bebidaAbiertaPorArticulo(bebidaAbierta), [bebidaAbierta])
+  const tragos = useMemo(() => tragosDeCortesia(retiros), [retiros])
   const nombreAbierta = (id: string) => bebidaAbierta.find((b) => b.articulo_id === id)?.articulo?.nombre ?? '¿?'
   const hayPrecios = resumen.totales.costo != null || resumen.totales.facturacion != null
   const negativos = resumen.filas.filter((f) => f.ventaEstimada < 0)
@@ -147,6 +148,25 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
             venta. Solo se calculan para artículos con precio cargado.
           </p>
         </>
+      )}
+
+      {tragos.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-lg font-semibold">Tragos y vasos de cortesía</h3>
+          <p className="text-xs text-suave">Informativo: salen de las botellas de las barras, que ya están dentro del consumido.</p>
+          <Tarjeta className="divide-y divide-borde">
+            {tragos.map((t) => (
+              <div key={t.nombre} className="flex justify-between px-4 py-2.5">
+                <span>{t.nombre}</span>
+                <span className="tabular font-semibold">{formatoVasos(t.vasos)}</span>
+              </div>
+            ))}
+            <div className="flex justify-between px-4 py-2.5 text-sm text-suave">
+              <span>Total</span>
+              <span className="tabular font-semibold text-tinta">{formatoVasos(tragos.reduce((t, x) => t + x.vasos, 0))}</span>
+            </div>
+          </Tarjeta>
+        </section>
       )}
 
       <section className="space-y-2">

@@ -46,7 +46,7 @@ export function useEvento(id: string) {
           .eq('evento_id', id),
         sb
           .from('retiros')
-          .select('*, articulo:articulos(nombre, unidad), autor:perfiles(nombre)')
+          .select('*, articulo:articulos(nombre, unidad), trago:tragos(nombre), autor:perfiles(nombre)')
           .eq('evento_id', id)
           .order('hora', { ascending: false }),
         sb

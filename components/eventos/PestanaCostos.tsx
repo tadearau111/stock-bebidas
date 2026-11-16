@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { Aviso, Tarjeta, cx } from '@/components/ui'
-import { costosDelEvento } from '@/lib/calculos/evento'
+import { costosDelEvento, soloBotellas } from '@/lib/calculos/evento'
 import { useArticulos } from '@/lib/datos'
 import { formatoCantidad, formatoNumero, formatoPesos } from '@/lib/formato'
 import type { DetalleEvento } from '@/lib/tipos'
@@ -24,7 +24,7 @@ export function PestanaCostos({ detalle }: { detalle: DetalleEvento }) {
         precios.push({ id: l.articulo_id, nombre: l.articulo.nombre, unidad: l.articulo.unidad, precio_costo: null, precio_venta: null })
       }
     }
-    return costosDelEvento(barras, lineas, retiros, precios)
+    return costosDelEvento(barras, lineas, soloBotellas(retiros), precios)
   }, [articulos, barras, lineas, retiros])
 
   const nombreBarra = (id: string) => barras.find((b) => b.id === id)?.nombre ?? 'Barra'

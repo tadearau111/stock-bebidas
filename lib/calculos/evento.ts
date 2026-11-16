@@ -290,3 +290,22 @@ export function costosDelEvento(
     lineasPendientes: lineas.filter((l) => l.stock_final == null).length,
   }
 }
+
+// ------------------------------------------------------------------ Tragos de cortesía
+
+/** Separa los retiros de botellas (cuentan en el resumen) de los tragos/vasos (informativos). */
+export function soloBotellas<T extends { articulo_id: string | null }>(retiros: T[]): (T & { articulo_id: string })[] {
+  return retiros.filter((r): r is T & { articulo_id: string } => r.articulo_id != null)
+}
+
+/** Total de vasos de cortesía por trago: "Trago Absolut" → 5. */
+export function tragosDeCortesia(retiros: { trago_id: string | null; cantidad: number; trago?: { nombre: string } | null }[]) {
+  const m = new Map<string, { nombre: string; vasos: number }>()
+  for (const r of retiros) {
+    if (!r.trago_id) continue
+    const actual = m.get(r.trago_id) ?? { nombre: r.trago?.nombre ?? 'Trago', vasos: 0 }
+    actual.vasos += r.cantidad
+    m.set(r.trago_id, actual)
+  }
+  return [...m.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+}

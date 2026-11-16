@@ -10,6 +10,7 @@ import { formatoFechaHora, mensajeError } from '@/lib/formato'
 import { AREAS, describir, type Nombres, type RegistroAuditoria } from '@/lib/historial'
 import { useLocalId, useSesion } from '@/lib/sesion'
 import { supabase } from '@/lib/supabase/cliente'
+import { useTragos } from '@/lib/tragos'
 import { useNombresUsuarios, useRoles } from '@/lib/usuarios'
 
 const POR_PAGINA = 50
@@ -26,6 +27,7 @@ export default function PaginaHistorial() {
   const { data: articulos } = useArticulos()
   const { data: eventos } = useEventos()
   const { data: roles } = useRoles()
+  const { data: tragos } = useTragos()
 
   const nombres: Nombres = useMemo(
     () => ({
@@ -33,8 +35,9 @@ export default function PaginaHistorial() {
       articulos: new Map((articulos ?? []).map((a) => [a.id, a.nombre])),
       eventos: new Map((eventos ?? []).map((e) => [e.id, e.nombre])),
       roles: new Map((roles ?? []).map((r) => [r.id, r.nombre])),
+      tragos: new Map((tragos ?? []).map((t) => [t.id, t.nombre])),
     }),
-    [usuarios, articulos, eventos, roles],
+    [usuarios, articulos, eventos, roles, tragos],
   )
 
   const consulta = useInfiniteQuery({

@@ -6,7 +6,8 @@ import { consumido, faltaEnDeposito, stockFinalValido, totalLlevado, totalReposi
 import { coincideBusqueda } from '@/lib/calculos/stock'
 import { useArticulos } from '@/lib/datos'
 import { ejecutar, useCambioEvento, useStockLocal } from '@/lib/eventos'
-import { ahoraParaInput, detalleArticulo, formatoCantidad, formatoHora, formatoNumero, mensajeError } from '@/lib/formato'
+import { useGuardarTrago, useTragos } from '@/lib/tragos'
+import { ahoraParaInput, detalleArticulo, formatoCantidad, formatoHora, formatoNumero, formatoVasos, mensajeError } from '@/lib/formato'
 import { useLocalId, useSesion } from '@/lib/sesion'
 import type { Barra, DetalleEvento, LineaBarraDB, RetiroDB } from '@/lib/tipos'
 
@@ -581,7 +582,7 @@ function SeccionRetiros({
   const [error, setError] = useState('')
 
   async function borrar(r: RetiroDB) {
-    if (!confirm(`¿Borrar el retiro de ${r.cantidad} ${r.articulo?.nombre ?? ''}?`)) return
+    if (!confirm(`¿Borrar el retiro de ${r.cantidad} ${r.articulo?.nombre ?? r.trago?.nombre ?? ''}?`)) return
     try {
       await cambio.mutateAsync((sb) => ejecutar(sb.from('retiros').delete().eq('id', r.id)))
     } catch (err) {
@@ -611,7 +612,8 @@ function SeccionRetiros({
             <div key={r.id} className="flex items-center justify-between gap-2 px-3 py-2.5">
               <div className="min-w-0">
                 <p className="font-medium">
-                  {r.articulo?.nombre} · <span className="tabular">{formatoCantidad(r.cantidad, r.articulo?.unidad)}</span>{' '}
+                  {r.articulo?.nombre ?? r.trago?.nombre} ·{' '}
+                  <span className="tabular">{r.trago_id ? formatoVasos(r.cantidad) : formatoCantidad(r.cantidad, r.articulo?.unidad)}</span>{' '}
                   <Etiqueta color={r.tipo === 'personal' ? 'gris' : 'verde'}>{r.tipo === 'personal' ? 'Personal' : 'Cortesía'}</Etiqueta>
                 </p>
                 <p className="truncate text-xs text-suave">
@@ -632,8 +634,14 @@ function SeccionRetiros({
 function FormRetiro({ barra, lineas, eventoId, alTerminar }: { barra: Barra; lineas: LineaBarraDB[]; eventoId: string; alTerminar: () => void }) {
   const localId = useLocalId()
   const cambio = useCambioEvento(eventoId)
-  const [articuloId, setArticuloId] = useState(lineas.length === 1 ? lineas[0].articulo_id : '')
+  const { puede } = useSesion()
+  const { data: tragos } = useTragos()
+  const guardarTrago = useGuardarTrago()
+  // "a:<id>" = botella de la barra · "t:<id>" = trago o vaso (solo cortesías)
+  const [eleccion, setEleccion] = useState(lineas.length === 1 ? `a:${lineas[0].articulo_id}` : '')
   const [tipo, setTipo] = useState<'personal' | 'cortesia'>('personal')
+  const [nuevoTrago, setNuevoTrago] = useState<string | null>(null)
+  const esTrago = eleccion.startsWith('t:')
   const [cantidad, setCantidad] = useState('1')
   const [quien, setQuien] = useState('')
   const [hora, setHora] = useState(ahoraParaInput())
@@ -643,7 +651,8 @@ function FormRetiro({ barra, lineas, eventoId, alTerminar }: { barra: Barra; lin
     e.preventDefault()
     setError('')
     const n = Number(cantidad)
-    if (!articuloId) return setError('Elegí el artículo.')
+    if (!eleccion) return setError('Elegí qué se retiró.')
+    if (esTrago && tipo !== 'cortesia') return setError('Los tragos y vasos solo se cargan como cortesía.')
     if (!Number.isInteger(n) || n <= 0) return setError('La cantidad tiene que ser un número entero mayor a 0.')
     if (!quien.trim()) return setError('Anotá quién lo retiró.')
     try {
@@ -653,7 +662,8 @@ function FormRetiro({ barra, lineas, eventoId, alTerminar }: { barra: Barra; lin
             barra_id: barra.id,
             evento_id: eventoId,
             local_id: localId,
-            articulo_id: articuloId,
+            articulo_id: esTrago ? null : eleccion.slice(2),
+            trago_id: esTrago ? eleccion.slice(2) : null,
             tipo,
             cantidad: n,
             retirado_por: quien.trim(),
@@ -676,28 +686,90 @@ function FormRetiro({ barra, lineas, eventoId, alTerminar }: { barra: Barra; lin
             ['cortesia', 'Cortesía'],
           ] as const
         ).map(([t, texto]) => (
-          <button key={t} type="button" onClick={() => setTipo(t)} className={cx('rounded-md py-2', tipo === t ? 'plata font-semibold' : 'text-suave')}>
+          <button
+            key={t}
+            type="button"
+            onClick={() => {
+              setTipo(t)
+              if (t === 'personal' && esTrago) setEleccion('')
+            }}
+            className={cx('rounded-md py-2', tipo === t ? 'plata font-semibold' : 'text-suave')}
+          >
             {texto}
           </button>
         ))}
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Artículo *</label>
+        <label className="mb-1 block text-sm font-medium">{tipo === 'cortesia' ? 'Botella, trago o vaso *' : 'Artículo *'}</label>
         <select
-          value={articuloId}
-          onChange={(e) => setArticuloId(e.target.value)}
+          value={eleccion}
+          onChange={(e) => setEleccion(e.target.value)}
           className="block min-h-11 w-full rounded-lg border border-borde bg-superficie px-3 outline-none focus:border-marca-500"
         >
           <option value="">Elegí…</option>
-          {lineas.map((l) => (
-            <option key={l.articulo_id} value={l.articulo_id}>
-              {l.articulo.nombre}
-            </option>
-          ))}
+          <optgroup label="Botellas de esta barra">
+            {lineas.map((l) => (
+              <option key={l.articulo_id} value={`a:${l.articulo_id}`}>
+                {l.articulo.nombre}
+              </option>
+            ))}
+          </optgroup>
+          {tipo === 'cortesia' && (
+            <optgroup label="Tragos y vasos">
+              {(tragos ?? [])
+                .filter((t) => t.activo)
+                .map((t) => (
+                  <option key={t.id} value={`t:${t.id}`}>
+                    {t.nombre}
+                  </option>
+                ))}
+            </optgroup>
+          )}
         </select>
+        {esTrago && <p className="mt-1 text-xs text-suave">Se cuenta en vasos. Es informativo: no descuenta del depósito (sale de las botellas de la barra).</p>}
+        {tipo === 'cortesia' && puede('articulos.editar') && nuevoTrago == null && (
+          <button type="button" onClick={() => setNuevoTrago('')} className="mt-1 text-sm text-marca-700 underline">
+            + Agregar otro trago o vaso a la lista
+          </button>
+        )}
+        {nuevoTrago != null && (
+          <div className="mt-2 flex gap-2">
+            <input
+              value={nuevoTrago}
+              onChange={(e) => setNuevoTrago(e.target.value)}
+              placeholder="Ej: Trago Fernet"
+              autoFocus
+              className="min-h-11 w-full flex-1 rounded-lg border border-borde bg-superficie px-3 outline-none focus:border-marca-500"
+            />
+            <Boton
+              variante="secundario"
+              cargando={guardarTrago.isPending}
+              onClick={async () => {
+                if (!nuevoTrago.trim()) return
+                try {
+                  const t = await guardarTrago.mutateAsync({ nombre: nuevoTrago.trim() })
+                  setEleccion(`t:${t.id}`)
+                  setNuevoTrago(null)
+                } catch (err) {
+                  setError(mensajeError(err))
+                }
+              }}
+            >
+              Agregar
+            </Boton>
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Campo etiqueta="Cantidad *" type="number" inputMode="numeric" min={1} step={1} value={cantidad} onChange={(e) => setCantidad(e.target.value)} />
+        <Campo
+          etiqueta={esTrago ? 'Cantidad (vasos) *' : 'Cantidad *'}
+          type="number"
+          inputMode="numeric"
+          min={1}
+          step={1}
+          value={cantidad}
+          onChange={(e) => setCantidad(e.target.value)}
+        />
         <Campo etiqueta="Hora" type="datetime-local" value={hora} onChange={(e) => setHora(e.target.value)} />
       </div>
       <Campo

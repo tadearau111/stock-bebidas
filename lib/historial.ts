@@ -17,10 +17,12 @@ export interface Nombres {
   articulos: Map<string, string>
   eventos: Map<string, string>
   roles: Map<string, string>
+  tragos?: Map<string, string>
 }
 
 const SUJETOS: Record<string, string> = {
   articulos: 'artículo',
+  tragos: 'trago de cortesía',
   movimientos: 'movimiento del depósito',
   eventos: 'evento',
   barras: 'barra',
@@ -36,7 +38,7 @@ const SUJETOS: Record<string, string> = {
 }
 
 export const AREAS: Record<string, string[]> = {
-  'Depósito y artículos': ['articulos', 'movimientos'],
+  'Depósito y artículos': ['articulos', 'movimientos', 'tragos'],
   Eventos: ['eventos', 'barras', 'barra_articulos', 'reposiciones', 'retiros', 'bebida_abierta', 'evento_asignaciones'],
   'Usuarios y permisos': ['perfiles', 'miembros', 'roles', 'rol_permisos'],
 }
@@ -67,6 +69,7 @@ const CAMPOS: Record<string, string> = {
   rol_id: 'Rol',
   usuario_id: 'Usuario',
   articulo_id: 'Artículo',
+  trago_id: 'Trago',
   evento_id: 'Evento',
   permiso_codigo: 'Permiso',
 }
@@ -92,6 +95,7 @@ export function formatoValor(campo: string, valor: unknown, nombres?: Nombres): 
     if (campo === 'articulo_id') return nombres.articulos.get(texto) ?? 'artículo'
     if (campo === 'evento_id') return nombres.eventos.get(texto) ?? 'evento'
     if (campo === 'rol_id') return nombres.roles.get(texto) ?? 'rol'
+    if (campo === 'trago_id') return nombres.tragos?.get(texto) ?? 'trago'
   }
   if (campo === 'hora' || (campo === 'fecha' && texto.includes('T'))) return fmtFechaHora.format(new Date(texto))
   if (campo === 'fecha' && /^\d{4}-\d{2}-\d{2}$/.test(texto)) return texto.split('-').reverse().join('/')

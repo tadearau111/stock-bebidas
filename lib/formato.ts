@@ -18,6 +18,9 @@ export function formatoCantidad(n: number, unidad: Unidad = 'unidad'): string {
   return `${formatoNumero(n)} u.`
 }
 
+/** "1 vaso", "3 vasos" (tragos de cortesía) */
+export const formatoVasos = (n: number) => `${formatoNumero(n)} ${Math.abs(n) === 1 ? 'vaso' : 'vasos'}`
+
 /** "Coca Cola · 2.0 L" */
 export function detalleArticulo(a: { marca: string | null; tamano: string | null }): string {
   return [a.marca, a.tamano].filter(Boolean).join(' · ')
@@ -44,6 +47,7 @@ export function mensajeError(error: unknown): string {
   const e = error as { message?: string; code?: string } | null
   const msg = e?.message ?? String(error)
   if (msg.includes('roles_nombre_key')) return 'Ya existe un rol con ese nombre.'
+  if (msg.includes('tragos_nombre_unico')) return 'Ya existe un trago con ese nombre.'
   if (msg.includes('evento_asignaciones_pkey')) return 'Ese evento ya estaba asignado.'
   if (e?.code === '23505' || msg.includes('articulos_nombre_unico')) return 'Ya existe un artículo con ese nombre.'
   if (e?.code === '23503' && msg.includes('miembros')) return 'No se puede borrar: hay usuarios con ese rol.'
