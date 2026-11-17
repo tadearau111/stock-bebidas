@@ -91,6 +91,8 @@ export interface RenglonResumen {
   evento_id: string | null
   /** En los renglones de gastos: el detalle de cada gasto */
   items?: { detalle: string; monto: number }[]
+  /** En retiros/ingresos: id del movimiento (para editarlo) */
+  ref?: string
 }
 
 export interface ResumenMes {
@@ -127,6 +129,7 @@ export function aRenglonResumen(r: Renglon): RenglonResumen {
     monto: r.monto,
     saldo: r.saldo,
     evento_id: null,
+    ref: r.mov.id,
   }
 }
 
@@ -176,3 +179,59 @@ export function cierreDesactualizado(guardado: Omit<ResumenMes, 'clave' | 'rengl
 
 const NOMBRES_MES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 export const nombreMes = (mes: number) => NOMBRES_MES[mes - 1]
+
+// ------------------------------------------------------------------ Saldo arrastrado mes a mes
+
+export interface CierreGuardado extends Omit<ResumenMes, 'clave'> {
+  id?: string
+}
+
+export interface MesEncadenado {
+  clave: string
+  anio: number
+  mes: number
+  /** Lo que da con los datos de hoy, empezando con el saldo arrastrado del mes anterior */
+  vivo: ResumenMes
+  /** El resumen guardado al cerrar el mes (si existe) */
+  guardado: CierreGuardado | null
+  /** Lo que se muestra: lo guardado manda; si no hay, lo de hoy */
+  mostrado: ResumenMes
+  desactualizado: boolean
+}
+
+/** Rearma un mes empezando desde otro saldo inicial (recalcula el saldo de cada renglón). */
+function desdeSaldo(m: ResumenMes, inicial: number): ResumenMes {
+  let saldo = inicial
+  const renglones = m.renglones.map((r) => {
+    saldo = centavos(saldo + r.monto)
+    return { ...r, saldo }
+  })
+  return { ...m, saldo_inicial: centavos(inicial), saldo_final: saldo, renglones }
+}
+
+/**
+ * Encadena los meses: cada mes arranca con el saldo con que CERRÓ el anterior.
+ * Si el mes anterior tiene un resumen guardado, manda lo guardado (así, si
+ * después se borra un evento viejo, el saldo de los meses siguientes no cambia;
+ * solo se avisa en ese mes que quedó desactualizado).
+ */
+export function encadenarMeses(meses: ResumenMes[], cierres: CierreGuardado[], hoy = new Date()): { meses: MesEncadenado[]; saldoActual: number } {
+  const clave = (a: number, m: number) => `${a}-${String(m).padStart(2, '0')}`
+  const vivos = new Map(meses.map((m) => [m.clave, m]))
+  const guardados = new Map(cierres.map((c) => [clave(c.anio, c.mes), c]))
+  const claves = [...new Set([...vivos.keys(), ...guardados.keys(), mesActual(hoy)])].sort()
+
+  let arrastre = 0
+  const salida: MesEncadenado[] = []
+  for (const k of claves) {
+    const [anio, mes] = k.split('-').map(Number)
+    const base: ResumenMes = vivos.get(k) ?? { anio, mes, clave: k, saldo_inicial: 0, efectivo: 0, gastos: 0, retiros: 0, ingresos: 0, saldo_final: 0, renglones: [] }
+    const vivo = desdeSaldo(base, arrastre)
+    const guardado = guardados.get(k) ?? null
+    const desactualizado = !!guardado && cierreDesactualizado(guardado, vivo)
+    const mostrado: ResumenMes = guardado ? { ...guardado, clave: k } : vivo
+    salida.push({ clave: k, anio, mes, vivo, guardado, mostrado, desactualizado })
+    arrastre = mostrado.saldo_final
+  }
+  return { meses: salida, saldoActual: arrastre }
+}

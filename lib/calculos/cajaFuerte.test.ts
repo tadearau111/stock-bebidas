@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { armarLibro, cierreDesactualizado, mesActual, nombreMes, resumirPorMes } from './cajaFuerte'
+import { armarLibro, cierreDesactualizado, encadenarMeses, mesActual, nombreMes, resumirPorMes } from './cajaFuerte'
 
 const ev = (id: string, fecha: string, efectivo: number, gastos: number) => ({ evento_id: id, fecha, nombre: id, efectivo, gastos })
 
@@ -106,5 +106,49 @@ describe('Detalle de gastos en el resumen mensual', () => {
       { detalle: 'Propina DJ', monto: 10 },
     ])
     expect(nov.renglones.find((r) => r.clase === 'efectivo')?.items).toBeUndefined()
+  })
+})
+
+describe('El saldo se arrastra de mes a mes', () => {
+  const hoy = new Date(2027, 1, 15) // febrero 2027
+  const libro = armarLibro(
+    [ev('Octubre', '2026-10-18', 100_000, 10_000), ev('Noviembre', '2026-11-14', 50_000, 0)],
+    [{ id: 'r', tipo: 'retiro', monto: 20_000, detalle: 'Sueldos', fecha: '2027-01-10T12:00:00' }],
+  )
+  const meses = resumirPorMes(libro, hoy)
+
+  it('cada mes empieza con el saldo con que cerró el anterior (también los meses sin movimientos)', () => {
+    const r = encadenarMeses(meses, [], hoy)
+    expect(r.meses.map((m) => [m.clave, m.mostrado.saldo_inicial, m.mostrado.saldo_final])).toEqual([
+      ['2026-10', 0, 90_000],
+      ['2026-11', 90_000, 140_000],
+      ['2027-01', 140_000, 120_000],
+      ['2027-02', 120_000, 120_000],
+    ])
+    expect(r.saldoActual).toBe(120_000)
+  })
+
+  it('si después se borra un evento viejo, manda lo guardado y el saldo de hoy no cambia', () => {
+    const guardados = encadenarMeses(meses, [], hoy).meses.filter((m) => m.clave < '2027-02').map((m) => ({ ...m.vivo }))
+    // se borra definitivamente el evento de octubre
+    const sinOctubre = resumirPorMes(
+      armarLibro([ev('Noviembre', '2026-11-14', 50_000, 0)], [{ id: 'r', tipo: 'retiro', monto: 20_000, detalle: 'Sueldos', fecha: '2027-01-10T12:00:00' }]),
+      hoy,
+    )
+    const r = encadenarMeses(sinOctubre, guardados, hoy)
+    expect(r.saldoActual).toBe(120_000) // igual que antes
+    const oct = r.meses.find((m) => m.clave === '2026-10')!
+    expect(oct.mostrado.saldo_final).toBe(90_000) // el registro de octubre sigue
+    expect(oct.desactualizado).toBe(true) // y avisa que hoy daría distinto
+    expect(r.meses.find((m) => m.clave === '2026-11')!.desactualizado).toBe(false)
+  })
+
+  it('al actualizar un mes guardado, el siguiente arranca con el saldo nuevo y avisa que quedó desactualizado', () => {
+    const guardados = encadenarMeses(meses, [], hoy).meses.filter((m) => m.clave < '2027-02').map((m) => ({ ...m.vivo }))
+    guardados[0] = { ...guardados[0], efectivo: 110_000, saldo_final: 100_000 } // octubre actualizado (+10.000)
+    const r = encadenarMeses(meses, guardados, hoy)
+    const nov = r.meses.find((m) => m.clave === '2026-11')!
+    expect(nov.vivo.saldo_inicial).toBe(100_000)
+    expect(nov.desactualizado).toBe(true)
   })
 })

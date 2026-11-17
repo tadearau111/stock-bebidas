@@ -1,17 +1,16 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { BotonesExportar } from '@/components/Exportar'
 import { Aviso, Boton, Campo, Cargando, Tarjeta, Ventana, cx } from '@/components/ui'
 import {
   armarLibro,
-  cierreDesactualizado,
+  encadenarMeses,
   mesActual,
   nombreMes,
   resumirPorMes,
   type MovimientoManual,
-  type Renglon,
   type RenglonResumen,
 } from '@/lib/calculos/cajaFuerte'
 import { useBorrarMovimientoCajaFuerte, useCajaFuerte, useCierres, useGuardarCierre, useMovimientoCajaFuerte } from '@/lib/cajaFuerte'
@@ -34,36 +33,33 @@ export default function PaginaCajaFuerte() {
   const intentados = useRef(new Set<string>())
 
   const libro = useMemo(() => (data ? armarLibro(data.eventos, data.manuales) : null), [data])
-  const meses = useMemo(() => (libro ? resumirPorMes(libro) : []), [libro])
   const actual = mesActual()
-
-  // Pestañas: los meses calculados + los que solo quedan guardados en un cierre
-  const claves = useMemo(() => {
-    const set = new Set(meses.map((m) => m.clave))
-    for (const c of cierres ?? []) set.add(`${c.anio}-${String(c.mes).padStart(2, '0')}`)
-    return [...set].sort()
-  }, [meses, cierres])
-  const cierreDe = (clave: string) => cierres?.find((c) => `${c.anio}-${String(c.mes).padStart(2, '0')}` === clave)
+  // Cada mes arranca con el saldo con que cerró el anterior (manda lo guardado)
+  const cadena = useMemo(() => (libro && cierres ? encadenarMeses(resumirPorMes(libro), cierres) : null), [libro, cierres])
+  const claves = cadena?.meses.map((m) => m.clave) ?? []
+  const mesDe = (clave: string) => cadena?.meses.find((m) => m.clave === clave)
 
   // Cuando un mes terminó y todavía no tiene su resumen guardado, se guarda solo
   useEffect(() => {
-    if (!cierres || !meses.length) return
-    for (const m of meses) {
-      if (m.clave >= actual || cierreDe(m.clave) || intentados.current.has(m.clave)) continue
+    if (!cadena) return
+    for (const m of cadena.meses) {
+      if (m.clave >= actual || m.guardado || intentados.current.has(m.clave)) continue
       intentados.current.add(m.clave)
-      guardarCierre.mutate({ resumen: m })
+      guardarCierre.mutate({ resumen: m.vivo })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cierres, meses, actual])
+  }, [cadena, actual])
 
   if (!permitido) return <Aviso>No tenés permiso para ver la caja fuerte.</Aviso>
 
   const clave = elegido && claves.includes(elegido) ? elegido : actual
-  const enVivo = meses.find((m) => m.clave === clave) ?? null
-  const cierre = cierreDe(clave)
-  const desactualizado = !!(cierre && enVivo && cierreDesactualizado(cierre, enVivo))
+  const mesSel_ = mesDe(clave)
+  const enVivo = mesSel_?.vivo ?? null
+  const cierre = cierres?.find((c) => `${c.anio}-${String(c.mes).padStart(2, '0')}` === clave)
+  const desactualizado = !!mesSel_?.desactualizado
   // Lo que se muestra: el resumen guardado (si el mes ya cerró) o lo calculado
-  const mostrado = cierre && !verActual ? { ...cierre, clave } : enVivo
+  const mostrado = verActual ? enVivo : (mesSel_?.mostrado ?? null)
+  const editable = !cierre || verActual
   const [anioSel, mesSel] = clave.split('-').map(Number)
 
   const porAnio = new Map<number, string[]>()
@@ -106,11 +102,14 @@ export default function PaginaCajaFuerte() {
         <Cargando />
       ) : error ? (
         <Aviso>{mensajeError(error)}</Aviso>
-      ) : libro ? (
+      ) : libro && cadena ? (
         <>
           <Tarjeta className="border-marca-500 px-5 py-4">
             <p className="text-sm text-suave">Saldo actual en caja fuerte</p>
-            <p className={cx('tabular text-4xl font-semibold', libro.saldo < 0 ? 'text-alerta' : 'texto-plata')}>{formatoPesos(libro.saldo)}</p>
+            <p className={cx('tabular text-4xl font-semibold', cadena.saldoActual < 0 ? 'text-alerta' : 'texto-plata')}>
+              {formatoPesos(cadena.saldoActual)}
+            </p>
+            <p className="text-xs text-suave">Se arrastra de mes a mes: cada mes empieza con el saldo con que cerró el anterior.</p>
           </Tarjeta>
 
           {/* Pestañas por año y mes */}
@@ -138,7 +137,7 @@ export default function PaginaCajaFuerte() {
                         >
                           {nombreMes(m).slice(0, 3)}
                           {c === actual && <span className="ml-1 text-[10px] opacity-70">(actual)</span>}
-                          {cierreDe(c) && c !== clave && <span className="ml-1 text-[10px] opacity-60">✓</span>}
+                          {mesDe(c)?.guardado && c !== clave && <span className="ml-1 text-[10px] opacity-60">✓</span>}
                         </button>
                       )
                     })}
@@ -196,20 +195,12 @@ export default function PaginaCajaFuerte() {
                     </span>
                   )}
                 </Tarjeta>
-              ) : cierre && !verActual ? (
-                <Tarjeta className="divide-y divide-borde">
-                  {[...mostrado.renglones].reverse().map((r, i) => (
-                    <FilaGuardada key={i} r={r} />
-                  ))}
-                </Tarjeta>
               ) : (
                 <Tarjeta className="divide-y divide-borde">
-                  {[...libro.renglones]
-                    .filter((r) => r.fecha.slice(0, 7) === clave)
-                    .reverse()
-                    .map((r) => (
-                      <Fila key={r.clave} r={r} editar={(mov) => setEdicion({ tipo: mov.tipo, mov })} />
-                    ))}
+                  {[...mostrado.renglones].reverse().map((r, n) => {
+                    const mov = editable && r.ref ? data?.manuales.find((m) => m.id === r.ref) : undefined
+                    return <FilaMes key={`${r.ref ?? r.evento_id ?? ''}-${r.clase}-${n}`} r={r} editar={mov ? () => setEdicion({ tipo: mov.tipo, mov }) : undefined} />
+                  })}
                 </Tarjeta>
               )}
             </section>
@@ -228,19 +219,39 @@ export default function PaginaCajaFuerte() {
   )
 }
 
-/** Renglón de un resumen guardado (no se edita: es el registro del mes). */
-function FilaGuardada({ r }: { r: RenglonResumen }) {
+/** Un renglón del mes (guardado o de hoy). Los retiros/ingresos de hoy se pueden editar. */
+function FilaMes({ r, editar }: { r: RenglonResumen; editar?: () => void }) {
   const fecha = r.fecha.length === 10 ? formatoFechaEvento(r.fecha) : formatoFechaHora(r.fecha)
+  const deEvento = r.clase === 'efectivo' || r.clase === 'gastos'
   return (
     <div className="flex items-start justify-between gap-3 px-4 py-3">
       <div className="min-w-0">
         <p className="font-medium">
           {r.titulo}
-          {r.clase !== 'efectivo' && r.clase !== 'gastos' ? <span className="font-normal">: {r.detalle}</span> : null}
+          {!deEvento && <span className="font-normal">: {r.detalle}</span>}
         </p>
         <p className="text-xs text-suave">
-          {r.clase === 'efectivo' || r.clase === 'gastos' ? `${r.detalle} · ` : ''}
+          {deEvento &&
+            (r.evento_id ? (
+              <>
+                <Link href={`/evento?id=${r.evento_id}&p=caja`} className="text-marca-700 underline">
+                  {r.detalle}
+                </Link>{' '}
+                ·{' '}
+              </>
+            ) : (
+              `${r.detalle} · `
+            ))}
           {fecha}
+          {editar && (
+            <>
+              {' '}
+              ·{' '}
+              <button onClick={editar} className="text-marca-700 underline">
+                Editar
+              </button>
+            </>
+          )}
         </p>
         <DetalleGastos items={r.items} />
       </div>
@@ -283,47 +294,6 @@ function Total({ titulo, valor, signo, destacado }: { titulo: string; valor: num
         {formatoPesos(valor)}
       </p>
     </Tarjeta>
-  )
-}
-
-function Fila({ r, editar }: { r: Renglon; editar: (m: MovimientoManual) => void }) {
-  let titulo: ReactNode
-  let sub: ReactNode
-  if (r.clase === 'efectivo' || r.clase === 'gastos') {
-    titulo = r.clase === 'efectivo' ? 'Efectivo real' : 'Gastos'
-    sub = (
-      <>
-        <Link href={`/evento?id=${r.evento.evento_id}&p=caja`} className="text-marca-700 underline">
-          {r.evento.nombre}
-        </Link>{' '}
-        · {formatoFechaEvento(r.evento.fecha)}
-      </>
-    )
-  } else {
-    titulo = (
-      <>
-        {r.clase === 'retiro' ? 'Retiro' : 'Ingreso'}: <span className="font-normal">{r.mov.detalle}</span>
-      </>
-    )
-    sub = (
-      <>
-        {formatoFechaHora(r.mov.fecha)}
-        {r.mov.autor ? ` · cargó ${r.mov.autor}` : ''} ·{' '}
-        <button onClick={() => editar(r.mov)} className="text-marca-700 underline">
-          Editar
-        </button>
-      </>
-    )
-  }
-  return (
-    <div className="flex items-start justify-between gap-3 px-4 py-3">
-      <div className="min-w-0">
-        <p className="font-medium">{titulo}</p>
-        <p className="text-xs text-suave">{sub}</p>
-        {r.clase === 'gastos' && <DetalleGastos items={r.evento.gastos_detalle} />}
-      </div>
-      <Monto monto={r.monto} saldo={r.saldo} />
-    </div>
   )
 }
 
