@@ -6,7 +6,7 @@ import { reporteAPdf } from './pdf'
 import { linkWhatsApp } from './compartir'
 import { reporteCajaFuerteMes, reporteDeposito, reporteEvento, reporteFaltantes, slug, textoCelda } from './reportes'
 
-const art = (nombre: string, stock: number, minimo: number, costo: number | null = null, venta: number | null = null, extra: Partial<Articulo> = {}): Articulo => ({
+const art = (nombre: string, stock: number, minimo: number, costo: number | null = null, mayorista: number | null = null, extra: Partial<Articulo> = {}): Articulo => ({
   id: slug(nombre),
   local_id: 'l',
   nombre,
@@ -15,7 +15,7 @@ const art = (nombre: string, stock: number, minimo: number, costo: number | null
   unidad: 'unidad',
   stock_minimo: minimo,
   precio_costo: costo,
-  precio_venta: venta,
+  precio_mayorista: mayorista,
   activo: true,
   creado_en: '',
   actualizado_en: '',
@@ -67,7 +67,7 @@ describe('Lista de faltantes', () => {
 })
 
 const detalle: DetalleEvento = {
-  evento: { id: 'e', local_id: 'l', fecha: '2026-11-20', nombre: 'Casamiento García', personas: 100, notas: null, creado_en: '', archivado: false, archivado_en: null },
+  evento: { id: 'e', local_id: 'l', fecha: '2026-11-20', nombre: 'Casamiento García', personas: 100, notas: null, creado_en: '', tipo_barra: 'propia', archivado: false, archivado_en: null },
   barras: [
     { id: 'b1', evento_id: 'e', nombre: 'Barra 1', orden: 1 },
     { id: 'b2', evento_id: 'e', nombre: 'Barra VIP', orden: 2 },
@@ -103,21 +103,31 @@ describe('Resumen de evento', () => {
     expect(r.textoWhatsApp).toContain('• Juan: Coca Cola 2 u.')
     // Coca: barra 1 consumió 10, VIP 10 → 20; personal 2 → venta 18
     expect(r.secciones[0].filas[0]).toEqual(['Coca Cola', 20, 2, 0, 18, 0.2])
-    // Cada barra muestra de dónde sale el costo: consumido x precio
+    // Cada barra muestra de dónde sale el total: consumido x precio (barra propia → costo)
     const barra1 = r.secciones.find((s) => s.titulo === 'Barra 1')!
-    expect(barra1.filas[0]).toEqual(['Coca Cola', 12, 0, 2, 10, 2, 8, 1, 10, 2, 16])
-    expect(barra1.total).toEqual(['Total Barra 1', null, null, null, null, null, null, null, 10, null, 16])
+    expect(barra1.columnas.map((c) => c.titulo)).toEqual(['Artículo', 'Stock inicial', 'Reposiciones', 'Stock final', 'Consumido', 'Precio costo', 'Total'])
+    expect(barra1.filas[0]).toEqual(['Coca Cola', 12, 0, 2, 10, 1, 10])
+    expect(barra1.total).toEqual(['Total Barra 1', null, null, null, null, null, 10])
     const vip = r.secciones.find((s) => s.titulo === 'Barra VIP')!
-    expect(vip.filas[0]).toEqual(['Coca Cola', 5, 5, 0, 10, 0, 10, 1, 10, 2, 20])
+    expect(vip.filas[0]).toEqual(['Coca Cola', 5, 5, 0, 10, 1, 10])
     // Costos: resumen por barra y total general
     const costos = r.secciones.find((s) => s.titulo === 'Costos')!
     expect(costos.filas).toEqual([
-      ['Barra 1', 10, 16, 6],
-      ['Barra VIP', 10, 20, 10],
+      ['Barra 1', 10],
+      ['Barra VIP', 10],
     ])
-    expect(costos.total).toEqual(['Total general', 20, 36, 16])
-    expect(r.textoWhatsApp).toContain('*Total costo:* $ 20,00')
+    expect(costos.total).toEqual(['Total general', 20])
+    expect(r.datos.find((d) => d[0] === 'Tipo de barra')?.[1]).toBe('Barra propia (precio costo)')
+    expect(r.textoWhatsApp).toContain('*Total a precio costo:* $ 20,00')
     expect(r.nombreArchivo).toBe('evento-casamiento-garcia-2026-11-20')
+  })
+  it('barra concesionada: calcula con precio mayorista', () => {
+    const r = reporteEvento({ ...detalle, evento: { ...detalle.evento, tipo_barra: 'concesionada' } }, articulos, { incluirCostos: true })
+    const barra1 = r.secciones.find((s) => s.titulo === 'Barra 1')!
+    expect(barra1.columnas[5].titulo).toBe('Precio mayorista')
+    expect(barra1.filas[0]).toEqual(['Coca Cola', 12, 0, 2, 10, 2, 20])
+    expect(r.secciones.find((s) => s.titulo === 'Costos')!.total).toEqual(['Total general', 40])
+    expect(r.textoWhatsApp).toContain('*Total a precio mayorista:* $ 40,00')
   })
   it('sin costos (para quien no gestiona eventos) no muestra precios', () => {
     const r = reporteEvento(detalle, articulos, { incluirCostos: false })

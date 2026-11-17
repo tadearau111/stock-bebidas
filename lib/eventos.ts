@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase/cliente'
 import { mandarAPapelera } from './papelera'
 import { useLocalId } from './sesion'
+import type { TipoBarra } from './calculos/evento'
 import type { DetalleEvento, Evento } from './tipos'
 
 function lanzar<T>(r: { data: T; error: unknown }): T {
@@ -118,6 +119,7 @@ export interface DatosEvento {
   nombre: string
   personas: number
   notas: string | null
+  tipo_barra: TipoBarra
 }
 
 export function useGuardarEvento() {

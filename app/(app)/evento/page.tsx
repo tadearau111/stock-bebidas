@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Fragment, Suspense, useState } from 'react'
 import { FormEvento } from '@/components/eventos/FormEvento'
+import { TIPOS_BARRA } from '@/lib/calculos/evento'
 import { PestanaBarra } from '@/components/eventos/PestanaBarra'
 import { PestanaBebidaAbierta } from '@/components/eventos/PestanaBebidaAbierta'
 import { PestanaCaja } from '@/components/eventos/PestanaCaja'
@@ -115,7 +116,7 @@ function Evento() {
           <div>
             <h1 className="text-2xl font-semibold">{evento.nombre}</h1>
             <p className="text-suave">
-              {formatoFechaEvento(evento.fecha)} · {formatoNumero(evento.personas)} personas
+              {formatoFechaEvento(evento.fecha)} · {formatoNumero(evento.personas)} personas · {TIPOS_BARRA[evento.tipo_barra ?? 'propia'].nombre}
             </p>
             {evento.notas && <p className="mt-1 text-sm text-suave">{evento.notas}</p>}
           </div>

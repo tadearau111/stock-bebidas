@@ -9,10 +9,12 @@ import {
   formatoBotellas,
   resumirEvento,
   soloBotellas,
+  TIPOS_BARRA,
   textoTotalRetiros,
   totalReposiciones,
   tragosRetirados,
   type ArticuloPrecio,
+  type TipoBarra,
 } from '../calculos/evento'
 import { CAJA_VACIA, cajaCargada, calcularCaja } from '../calculos/caja'
 import { nombreMes, type RenglonResumen } from '../calculos/cajaFuerte'
@@ -83,14 +85,14 @@ const unidadTexto = (u: 'unidad' | 'bolsa', n: number) => (u === 'bolsa' ? (n ==
 export function reporteDeposito(articulos: Articulo[], local: string, ahora = new Date()): Reporte {
   const activos = articulos.filter((a) => a.activo).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
   const bajos = activos.filter((a) => a.bajo_minimo)
-  const hayPrecios = activos.some((a) => a.precio_costo != null || a.precio_venta != null)
+  const hayPrecios = activos.some((a) => a.precio_costo != null || a.precio_mayorista != null)
   const columnas: Columna[] = [
     { titulo: 'Nombre' },
     { titulo: 'Marca' },
     { titulo: 'Tamaño' },
     { titulo: 'Stock actual', tipo: 'numero' },
     { titulo: 'Stock mínimo', tipo: 'numero' },
-    ...(hayPrecios ? [{ titulo: 'Precio costo', tipo: 'pesos' as const }, { titulo: 'Precio venta', tipo: 'pesos' as const }] : []),
+    ...(hayPrecios ? [{ titulo: 'Precio costo', tipo: 'pesos' as const }, { titulo: 'Precio mayorista', tipo: 'pesos' as const }] : []),
   ]
   const filas = activos.map((a) => [
     a.nombre,
@@ -98,7 +100,7 @@ export function reporteDeposito(articulos: Articulo[], local: string, ahora = ne
     a.tamano,
     a.stock_actual,
     a.stock_minimo,
-    ...(hayPrecios ? [a.precio_costo, a.precio_venta] : []),
+    ...(hayPrecios ? [a.precio_costo, a.precio_mayorista] : []),
   ])
   const valorizado = activos.reduce((t, a) => t + (a.precio_costo != null ? Math.max(a.stock_actual, 0) * a.precio_costo : 0), 0)
 
@@ -188,7 +190,7 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
   const precios = [...articulos]
   for (const l of lineas) {
     if (!precios.some((p) => p.id === l.articulo_id)) {
-      precios.push({ id: l.articulo_id, nombre: l.articulo.nombre, unidad: l.articulo.unidad, precio_costo: null, precio_venta: null })
+      precios.push({ id: l.articulo_id, nombre: l.articulo.nombre, unidad: l.articulo.unidad, precio_costo: null, precio_mayorista: null })
     }
   }
   const lineasCalc = lineas.map((l) => ({
@@ -199,8 +201,10 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
     reposiciones: l.reposiciones,
   }))
   const botellas = soloBotellas(retiros)
-  const resumen = resumirEvento(lineasCalc, botellas, precios, evento.personas)
-  const costos = costosDelEvento(barras, lineasCalc, botellas, precios)
+  const tipo: TipoBarra = evento.tipo_barra ?? 'propia'
+  const precio = TIPOS_BARRA[tipo].precio
+  const resumen = resumirEvento(lineasCalc, botellas, precios, evento.personas, tipo)
+  const costos = costosDelEvento(barras, lineasCalc, botellas, precios, tipo)
   const tragos = tragosRetirados(retiros)
   const abierta = bebidaAbiertaPorArticulo(bebidaAbierta)
   const nombreAbierta = (id: string) => bebidaAbierta.find((b) => b.articulo_id === id)?.articulo?.nombre ?? '¿?'
@@ -250,7 +254,7 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
       })
       continue
     }
-    // Con costos: la cuenta completa de la barra, de lo consumido al costo y la venta
+    // Con precios: la cuenta completa de la barra, de lo consumido al total
     const cb = costos.barras.find((x) => x.barra_id === b.id)
     const filaCosto = (articuloId: string) => cb?.filas.find((f) => f.articulo.id === articuloId)
     secciones.push({
@@ -261,12 +265,8 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
         { titulo: 'Reposiciones', tipo: 'numero' },
         { titulo: 'Stock final', tipo: 'numero' },
         { titulo: 'Consumido', tipo: 'numero' },
-        { titulo: 'Retiros', tipo: 'numero' },
-        { titulo: 'Vendido', tipo: 'numero' },
-        { titulo: 'Precio costo', tipo: 'pesos' },
-        { titulo: 'Total costo', tipo: 'pesos' },
-        { titulo: 'Precio venta', tipo: 'pesos' },
-        { titulo: 'Total venta', tipo: 'pesos' },
+        { titulo: precio.charAt(0).toUpperCase() + precio.slice(1), tipo: 'pesos' },
+        { titulo: 'Total', tipo: 'pesos' },
       ],
       filas: ls.map((l) => {
         const f = filaCosto(l.articulo_id)
@@ -276,20 +276,16 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
           totalReposiciones(l),
           l.stock_final,
           consumido(l),
-          f?.retiros ?? 0,
-          f && !f.pendiente ? f.vendido : null,
-          f?.articulo.precio_costo ?? null,
-          f?.totalCosto ?? null,
-          f?.articulo.precio_venta ?? null,
-          f?.totalVenta ?? null,
+          f?.precio ?? null,
+          f?.total ?? null,
         ]
       }),
       resaltar: ls.map((l, i) => (l.stock_final == null ? i : -1)).filter((i) => i >= 0),
-      total: ls.length ? [`Total ${b.nombre}`, null, null, null, null, null, null, null, cb?.totalCosto ?? 0, null, cb?.totalVenta ?? 0] : undefined,
+      total: ls.length ? [`Total ${b.nombre}`, null, null, null, null, null, cb?.total ?? 0] : undefined,
       nota:
         ls.length === 0
           ? 'Sin artículos.'
-          : 'Consumido = Stock inicial + Reposiciones - Stock final. Vendido = Consumido - Retiros (botellas). Total costo = Consumido x Precio costo. Total venta = Vendido x Precio venta.' +
+          : `Consumido = Stock inicial + Reposiciones - Stock final. Total = Consumido x ${precio} (${TIPOS_BARRA[tipo].nombre.toLowerCase()}).` +
             (ls.some((l) => l.stock_final == null) ? ' En rojo: falta el stock final (no se cuenta).' : ''),
     })
   }
@@ -339,13 +335,13 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
   if (opciones.incluirCostos) {
     secciones.push({
       titulo: 'Costos',
-      columnas: [{ titulo: 'Barra' }, { titulo: 'Total costo', tipo: 'pesos' }, { titulo: 'Total venta', tipo: 'pesos' }, { titulo: 'Diferencia', tipo: 'pesos' }],
-      filas: costos.barras.map((b) => [nombreBarra(b.barra_id), b.totalCosto, b.totalVenta, b.totalVenta - b.totalCosto]),
-      total: ['Total general', costos.totalCosto, costos.totalVenta, costos.diferencia],
+      columnas: [{ titulo: 'Barra' }, { titulo: `Total a ${precio}`, tipo: 'pesos' }],
+      filas: costos.barras.map((b) => [nombreBarra(b.barra_id), b.total]),
+      total: ['Total general', costos.total],
       nota:
         'El detalle de cada barra (cantidades consumidas, precios y totales por artículo) está en la sección de cada barra.' +
-        (costos.sinPrecioCosto.length ? ` Sin precio de costo (no se suman): ${costos.sinPrecioCosto.join(', ')}.` : '') +
-        (costos.sinPrecioVenta.length ? ` Sin precio de venta (no se suman): ${costos.sinPrecioVenta.join(', ')}.` : ''),
+        `${TIPOS_BARRA[tipo].nombre}: se calcula con ${precio}.` +
+        (costos.sinPrecio.length ? ` Sin ${precio} (no se suman): ${costos.sinPrecio.join(', ')}.` : ''),
     })
   }
 
@@ -403,7 +399,7 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
     ['Cortesías', cortesias.cantidadRetiros ? `${cortesias.cantidadRetiros} (${textoTotalRetiros(cortesias)})` : '0'],
   ]
   if (opciones.incluirCostos) {
-    datos.push(['Total precio costo', textoCelda(costos.totalCosto, 'pesos')], ['Total precio venta', textoCelda(costos.totalVenta, 'pesos')])
+    datos.push(['Tipo de barra', `${TIPOS_BARRA[tipo].nombre} (${precio})`], [`Total a ${precio}`, textoCelda(costos.total, 'pesos')])
   }
   if (hayCaja) {
     datos.push(['Venta total + boletería + guardarropas', textoCelda(caja.ventaTotalGeneral, 'pesos')], ['Retiro a caja fuerte', textoCelda(caja.retiroCajaFuerte, 'pesos')])
@@ -434,7 +430,7 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
   }
   if (abierta.size) lineasWa.push(`Bebida abierta: ${[...abierta.entries()].map(([id, n]) => `${nombreAbierta(id)} ${formatoBotellas(n)}`).join(', ')}`)
   if (opciones.incluirCostos) {
-    lineasWa.push('', `*Total costo:* ${textoCelda(costos.totalCosto, 'pesos')}`, `*Total venta:* ${textoCelda(costos.totalVenta, 'pesos')}`)
+    lineasWa.push('', `${TIPOS_BARRA[tipo].nombre}`, `*Total a ${precio}:* ${textoCelda(costos.total, 'pesos')}`)
   }
 
   if (hayCaja) {

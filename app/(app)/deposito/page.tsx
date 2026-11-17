@@ -174,7 +174,7 @@ export default function PaginaDeposito() {
                   <th className="px-4 py-3 text-right">Stock actual</th>
                   <th className="px-4 py-3 text-right">Stock mínimo</th>
                   <th className="px-4 py-3 text-right">Precio costo</th>
-                  <th className="px-4 py-3 text-right">Precio venta</th>
+                  <th className="px-4 py-3 text-right">Precio mayorista</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -191,7 +191,7 @@ export default function PaginaDeposito() {
                     </td>
                     <td className="tabular px-4 py-2.5 text-right">{formatoNumero(a.stock_minimo)}</td>
                     <td className="tabular px-4 py-2.5 text-right">{formatoPesos(a.precio_costo)}</td>
-                    <td className="tabular px-4 py-2.5 text-right">{formatoPesos(a.precio_venta)}</td>
+                    <td className="tabular px-4 py-2.5 text-right">{formatoPesos(a.precio_mayorista)}</td>
                     <td className="px-4 py-2.5 text-right">
                       <button onClick={() => setAccion({ tipo: 'opciones', articulo: a })} className="rounded-lg px-3 py-1 text-marca-700 hover:bg-marca-50">
                         Opciones
@@ -282,7 +282,7 @@ function OpcionesArticulo({
         {fila('Stock mínimo', formatoCantidad(a.stock_minimo, a.unidad))}
         {a.bajo_minimo && fila('Falta comprar', formatoCantidad(a.faltante, a.unidad), true)}
         {fila('Precio de costo', formatoPesos(a.precio_costo))}
-        {fila('Precio de venta', formatoPesos(a.precio_venta))}
+        {fila('Precio mayorista', formatoPesos(a.precio_mayorista))}
       </dl>
       {!a.activo && <Aviso tipo="info">Este artículo está desactivado: no aparece para cargar ingresos ni en las barras.</Aviso>}
       {error && <Aviso>{error}</Aviso>}

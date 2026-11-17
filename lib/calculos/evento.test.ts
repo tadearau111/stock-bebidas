@@ -147,34 +147,35 @@ describe('Bebida abierta: suma de fracciones', () => {
 
 describe('Resumen del evento', () => {
   const articulos = [
-    { id: 'coca', nombre: 'Coca Cola', unidad: 'unidad' as const, precio_costo: 1000, precio_venta: 3000 },
-    { id: 'hielo', nombre: 'Hielo', unidad: 'bolsa' as const, precio_costo: null, precio_venta: null },
+    { id: 'coca', nombre: 'Coca Cola', unidad: 'unidad' as const, precio_costo: 1000, precio_mayorista: 1500 },
+    { id: 'hielo', nombre: 'Hielo', unidad: 'bolsa' as const, precio_costo: null, precio_mayorista: null },
+  ]
+  const lineas = () => [linea(24, [12], 6, 'coca'), linea(12, [], 2, 'coca'), linea(10, [], 3, 'hielo')]
+  const retiros = [
+    { articulo_id: 'coca', tipo: 'personal' as const, cantidad: 4 },
+    { articulo_id: 'coca', tipo: 'cortesia' as const, cantidad: 2 },
   ]
 
-  it('suma todas las barras y detalla retiros, venta, costo y facturación', () => {
-    const r = resumirEvento(
-      [linea(24, [12], 6, 'coca'), linea(12, [], 2, 'coca'), linea(10, [], 3, 'hielo')],
-      [
-        { articulo_id: 'coca', tipo: 'personal', cantidad: 4 },
-        { articulo_id: 'coca', tipo: 'cortesia', cantidad: 2 },
-      ],
-      articulos,
-      40,
-    )
+  it('suma todas las barras y detalla retiros, venta estimada (unidades) y total a precio costo', () => {
+    const r = resumirEvento(lineas(), retiros, articulos, 40)
     const coca = r.filas.find((f) => f.articulo.id === 'coca')!
     expect(coca.consumido).toBe(40) // (24+12−6) + (12−2)
     expect(coca.retirosPersonal).toBe(4)
     expect(coca.cortesias).toBe(2)
     expect(coca.ventaEstimada).toBe(34) // 40 − 4 − 2
     expect(coca.porPersona).toBe(1)
-    expect(coca.costo).toBe(40_000)
-    expect(coca.facturacion).toBe(102_000)
+    expect(coca.total).toBe(40_000) // barra propia: consumido × costo
     const hielo = r.filas.find((f) => f.articulo.id === 'hielo')!
     expect(hielo.consumido).toBe(7)
-    expect(hielo.costo).toBeNull()
-    expect(r.totales.costo).toBe(40_000) // el hielo sin precio no suma
-    expect(r.totales.facturacion).toBe(102_000)
+    expect(hielo.total).toBeNull()
+    expect(r.totales.total).toBe(40_000) // el hielo sin precio no suma
     expect(r.barrasSinFinal).toBe(0)
+  })
+
+  it('barra concesionada: total a precio mayorista', () => {
+    const r = resumirEvento(lineas(), retiros, articulos, 40, 'concesionada')
+    expect(r.filas.find((f) => f.articulo.id === 'coca')!.total).toBe(60_000) // 40 × 1.500
+    expect(r.totales.total).toBe(60_000)
   })
 
   it('avisa si falta cargar algún stock final', () => {
@@ -189,24 +190,28 @@ describe('Resumen del evento', () => {
     expect(r.filas[0].porPersona).toBeNull()
   })
 
-  it('sin precios cargados, costo y facturación quedan vacíos', () => {
+  it('sin precios cargados, el total queda vacío', () => {
     const r = resumirEvento([linea(10, [], 5, 'hielo')], [], articulos, 10)
-    expect(r.totales.costo).toBeNull()
-    expect(r.totales.facturacion).toBeNull()
+    expect(r.totales.total).toBeNull()
   })
 })
 
-describe('Costos del evento', () => {
-  const coca = { id: 'coca', nombre: 'Coca Cola', unidad: 'unidad' as const, precio_costo: 1, precio_venta: 2 }
-  const fernet = { id: 'fernet', nombre: 'Fernet', unidad: 'unidad' as const, precio_costo: 10, precio_venta: 30 }
-  const hielo = { id: 'hielo', nombre: 'Hielo', unidad: 'bolsa' as const, precio_costo: null, precio_venta: null }
+describe('Costos del evento según el tipo de barra', () => {
+  const coca = { id: 'coca', nombre: 'Coca Cola', unidad: 'unidad' as const, precio_costo: 1, precio_mayorista: 2 }
+  const fernet = { id: 'fernet', nombre: 'Fernet', unidad: 'unidad' as const, precio_costo: 10, precio_mayorista: 15 }
+  const hielo = { id: 'hielo', nombre: 'Hielo', unidad: 'bolsa' as const, precio_costo: null, precio_mayorista: null }
   const enBarra = (barra_id: string, l: LineaBarra) => ({ ...l, barra_id })
 
-  it('ejemplo: 10 cocas a $1 de costo y $2 de venta → costo $10 y venta $20', () => {
-    const r = costosDelEvento([{ id: 'b1' }], [enBarra('b1', linea(12, [], 2, 'coca'))], [], [coca])
-    expect(r.totalCosto).toBe(10)
-    expect(r.totalVenta).toBe(20)
-    expect(r.diferencia).toBe(10)
+  it('barra propia: 10 cocas a $1 de costo → total $10', () => {
+    const r = costosDelEvento([{ id: 'b1' }], [enBarra('b1', linea(12, [], 2, 'coca'))], [], [coca], 'propia')
+    expect(r.total).toBe(10)
+    expect(r.barras[0].filas[0].precio).toBe(1)
+  })
+
+  it('barra concesionada: 10 cocas a $2 mayorista → total $20', () => {
+    const r = costosDelEvento([{ id: 'b1' }], [enBarra('b1', linea(12, [], 2, 'coca'))], [], [coca], 'concesionada')
+    expect(r.total).toBe(20)
+    expect(r.barras[0].filas[0].precio).toBe(2)
   })
 
   it('suma todas las barras y muestra el total de cada una', () => {
@@ -215,35 +220,38 @@ describe('Costos del evento', () => {
       [enBarra('b1', linea(12, [], 2, 'coca')), enBarra('vip', linea(5, [], 0, 'coca')), enBarra('vip', linea(3, [], 1, 'fernet'))],
       [],
       [coca, fernet],
+      'concesionada',
     )
-    expect(r.barras[0].totalCosto).toBe(10)
-    expect(r.barras[1].totalCosto).toBe(5 + 20)
-    expect(r.barras[1].totalVenta).toBe(10 + 60)
-    expect(r.totalCosto).toBe(35)
-    expect(r.totalVenta).toBe(90)
+    expect(r.barras[0].total).toBe(20)
+    expect(r.barras[1].total).toBe(10 + 30)
+    expect(r.total).toBe(60)
   })
 
-  it('lo retirado (personal y cortesías) cuesta pero no se vende', () => {
+  it('se calcula con todo lo consumido (incluye retiros de personal y cortesías)', () => {
     const r = costosDelEvento(
       [{ id: 'b1' }],
       [enBarra('b1', linea(12, [], 2, 'coca'))],
       [{ barra_id: 'b1', articulo_id: 'coca', tipo: 'personal', cantidad: 2 }],
       [coca],
     )
-    expect(r.totalCosto).toBe(10) // 10 consumidas
-    expect(r.totalVenta).toBe(16) // 8 vendidas
+    expect(r.total).toBe(10)
   })
 
-  it('avisa los artículos sin precio y no los suma', () => {
+  it('avisa los artículos sin el precio que corresponde y no los suma', () => {
     const r = costosDelEvento([{ id: 'b1' }], [enBarra('b1', linea(10, [], 4, 'hielo')), enBarra('b1', linea(12, [], 2, 'coca'))], [], [coca, hielo])
-    expect(r.totalCosto).toBe(10)
-    expect(r.sinPrecioCosto).toEqual(['Hielo'])
-    expect(r.sinPrecioVenta).toEqual(['Hielo'])
+    expect(r.total).toBe(10)
+    expect(r.sinPrecio).toEqual(['Hielo'])
+  })
+
+  it('un artículo con costo pero sin mayorista se avisa solo en barra concesionada', () => {
+    const soloCosto = { ...coca, precio_mayorista: null }
+    expect(costosDelEvento([{ id: 'b1' }], [enBarra('b1', linea(12, [], 2, 'coca'))], [], [soloCosto], 'propia').sinPrecio).toEqual([])
+    expect(costosDelEvento([{ id: 'b1' }], [enBarra('b1', linea(12, [], 2, 'coca'))], [], [soloCosto], 'concesionada').sinPrecio).toEqual(['Coca Cola'])
   })
 
   it('sin stock final no se cuenta y se avisa', () => {
     const r = costosDelEvento([{ id: 'b1' }], [enBarra('b1', linea(12, [], null, 'coca'))], [], [coca])
-    expect(r.totalCosto).toBe(0)
+    expect(r.total).toBe(0)
     expect(r.lineasPendientes).toBe(1)
     expect(r.barras[0].filas[0].pendiente).toBe(true)
   })

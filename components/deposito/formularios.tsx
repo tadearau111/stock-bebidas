@@ -18,7 +18,7 @@ export function FormArticulo({ articulo, alTerminar }: { articulo?: Articulo; al
   const [unidad, setUnidad] = useState<Unidad>(articulo?.unidad ?? 'unidad')
   const [minimo, setMinimo] = useState(String(articulo?.stock_minimo ?? 0))
   const [costo, setCosto] = useState(articulo?.precio_costo?.toString().replace('.', ',') ?? '')
-  const [venta, setVenta] = useState(articulo?.precio_venta?.toString().replace('.', ',') ?? '')
+  const [mayorista, setMayorista] = useState(articulo?.precio_mayorista?.toString().replace('.', ',') ?? '')
   const [error, setError] = useState('')
 
   async function enviar(e: FormEvent) {
@@ -26,11 +26,11 @@ export function FormArticulo({ articulo, alTerminar }: { articulo?: Articulo; al
     setError('')
     const min = Number(minimo || 0)
     const pc = leerPrecio(costo)
-    const pv = leerPrecio(venta)
+    const pm = leerPrecio(mayorista)
     if (!nombre.trim()) return setError('El nombre es obligatorio.')
     if (!Number.isInteger(min) || min < 0) return setError('El stock mínimo tiene que ser un número entero, 0 o más.')
     if (Number.isNaN(pc) || (pc ?? 0) < 0) return setError('El precio de costo no es válido.')
-    if (Number.isNaN(pv) || (pv ?? 0) < 0) return setError('El precio de venta no es válido.')
+    if (Number.isNaN(pm) || (pm ?? 0) < 0) return setError('El precio mayorista no es válido.')
     try {
       await guardar.mutateAsync({
         id: articulo?.id,
@@ -41,7 +41,7 @@ export function FormArticulo({ articulo, alTerminar }: { articulo?: Articulo; al
           unidad,
           stock_minimo: min,
           precio_costo: pc,
-          precio_venta: pv,
+          precio_mayorista: pm,
         },
       })
       alTerminar()
@@ -74,8 +74,22 @@ export function FormArticulo({ articulo, alTerminar }: { articulo?: Articulo; al
         />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Campo etiqueta="Precio de costo" inputMode="decimal" placeholder="Opcional" value={costo} onChange={(e) => setCosto(e.target.value)} />
-        <Campo etiqueta="Precio de venta" inputMode="decimal" placeholder="Opcional" value={venta} onChange={(e) => setVenta(e.target.value)} />
+        <Campo
+          etiqueta="Precio de costo"
+          inputMode="decimal"
+          placeholder="Opcional"
+          value={costo}
+          onChange={(e) => setCosto(e.target.value)}
+          ayuda="Para eventos con barra propia"
+        />
+        <Campo
+          etiqueta="Precio mayorista"
+          inputMode="decimal"
+          placeholder="Opcional"
+          value={mayorista}
+          onChange={(e) => setMayorista(e.target.value)}
+          ayuda="Para eventos con barra concesionada"
+        />
       </div>
       {error && <Aviso>{error}</Aviso>}
       <div className="flex gap-2 pt-2">

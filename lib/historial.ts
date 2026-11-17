@@ -59,6 +59,8 @@ const CAMPOS: Record<string, string> = {
   stock_minimo: 'Stock mínimo',
   precio_costo: 'Precio de costo',
   precio_venta: 'Precio de venta',
+  precio_mayorista: 'Precio mayorista',
+  tipo_barra: 'Tipo de barra',
   activo: 'Activo',
   tipo: 'Tipo',
   cantidad: 'Cantidad',
@@ -107,13 +109,14 @@ const OCULTAS = new Set(['id', 'local_id', 'creado_por', 'barra_id', 'barra_arti
 const VALORES: Record<string, Record<string, string>> = {
   tipo: { ingreso: 'Ingreso', ajuste: 'Ajuste', personal: 'Personal', cortesia: 'Cortesía', detalle: 'Detallada', total: 'Total directo' },
   unidad: { unidad: 'Unidad', bolsa: 'Bolsa' },
+  tipo_barra: { propia: 'Barra propia', concesionada: 'Barra concesionada' },
   cuartos: { '1': '¼', '2': '½', '3': '¾', '4': 'Entera' },
 }
 
 const fmtFechaHora = new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
 const CAMPOS_PESOS = new Set([
-  'precio_costo', 'precio_venta', 'efectivo_real', 'efectivo_sistema', 'cierre_lotes', 'tarjetas_sistema',
+  'precio_costo', 'precio_venta', 'precio_mayorista', 'efectivo_real', 'efectivo_sistema', 'cierre_lotes', 'tarjetas_sistema',
   'boleteria_efectivo', 'boleteria_lotes', 'guardarropas_efectivo', 'guardarropas_lotes', 'cambio_proxima_caja', 'monto',
 ])
 

@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { Aviso, Tarjeta, cx } from '@/components/ui'
 import {
+  TIPOS_BARRA,
   bebidaAbiertaPorArticulo,
   detalleRetiros,
   formatoBotellas,
@@ -11,6 +12,7 @@ import {
   sumarFracciones,
   textoTotalRetiros,
   tragosRetirados,
+  type TipoBarra,
 } from '@/lib/calculos/evento'
 import { BotonesExportar } from '@/components/Exportar'
 import { useArticulos } from '@/lib/datos'
@@ -23,6 +25,7 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
   const { data: articulos } = useArticulos()
   const { puede } = useSesion()
   const { evento, lineas, retiros, bebidaAbierta, barras } = detalle
+  const tipo: TipoBarra = evento.tipo_barra ?? 'propia'
 
   const resumen = useMemo(() => {
     const precios = (articulos ?? []).map((a) => ({
@@ -30,12 +33,12 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
       nombre: a.nombre,
       unidad: a.unidad,
       precio_costo: a.precio_costo,
-      precio_venta: a.precio_venta,
+      precio_mayorista: a.precio_mayorista,
     }))
     // si un artículo no está en la lista (p. ej. sin permiso), usar el nombre de la línea
     for (const l of lineas) {
       if (!precios.some((p) => p.id === l.articulo_id)) {
-        precios.push({ id: l.articulo_id, nombre: l.articulo.nombre, unidad: l.articulo.unidad, precio_costo: null, precio_venta: null })
+        precios.push({ id: l.articulo_id, nombre: l.articulo.nombre, unidad: l.articulo.unidad, precio_costo: null, precio_mayorista: null })
       }
     }
     return resumirEvento(
@@ -43,8 +46,9 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
       soloBotellas(retiros),
       precios,
       evento.personas,
+      tipo,
     )
-  }, [articulos, lineas, retiros, evento.personas])
+  }, [articulos, lineas, retiros, evento.personas, tipo])
 
   const abierta = useMemo(() => bebidaAbiertaPorArticulo(bebidaAbierta), [bebidaAbierta])
   const tragos = useMemo(() => tragosRetirados(retiros), [retiros])
@@ -52,7 +56,9 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
   const cortesias = useMemo(() => detalleRetiros(retiros, 'cortesia'), [retiros])
   const nombreBarra = (id: string) => barras.find((b) => b.id === id)?.nombre ?? 'Barra'
   const nombreAbierta = (id: string) => bebidaAbierta.find((b) => b.articulo_id === id)?.articulo?.nombre ?? '¿?'
-  const hayPrecios = resumen.totales.costo != null || resumen.totales.facturacion != null
+  // Los precios los ve quien gestiona eventos (igual que la pestaña Costos)
+  const hayPrecios = puede('eventos.gestionar') && resumen.totales.total != null
+  const precio = TIPOS_BARRA[tipo].precio
   const negativos = resumen.filas.filter((f) => f.ventaEstimada < 0)
 
   return (
@@ -64,7 +70,7 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
           crear={() =>
             reporteEvento(
               detalle,
-              (articulos ?? []).map((a) => ({ id: a.id, nombre: a.nombre, unidad: a.unidad, precio_costo: a.precio_costo, precio_venta: a.precio_venta })),
+              (articulos ?? []).map((a) => ({ id: a.id, nombre: a.nombre, unidad: a.unidad, precio_costo: a.precio_costo, precio_mayorista: a.precio_mayorista })),
               { incluirCostos: puede('eventos.gestionar') },
             )
           }
@@ -86,8 +92,7 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
         />
         {hayPrecios && (
           <>
-            <Dato titulo="Costo estimado" valor={formatoPesos(resumen.totales.costo)} ancho />
-            <Dato titulo="Facturación estimada" valor={formatoPesos(resumen.totales.facturacion)} ancho />
+            <Dato titulo={`Total a ${precio} (${TIPOS_BARRA[tipo].nombre.toLowerCase()})`} valor={formatoPesos(resumen.totales.total)} ancho />
           </>
         )}
       </div>
@@ -125,8 +130,7 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
                     <Mini titulo="Personal" valor={formatoNumero(f.retirosPersonal)} />
                     <Mini titulo="Cortesías" valor={formatoNumero(f.cortesias)} />
                     <Mini titulo="Por persona" valor={f.porPersona == null ? '—' : formatoNumero(Math.round(f.porPersona * 100) / 100)} />
-                    {hayPrecios && <Mini titulo="Costo" valor={formatoPesos(f.costo)} />}
-                    {hayPrecios && <Mini titulo="Facturación" valor={formatoPesos(f.facturacion)} />}
+                    {hayPrecios && <Mini titulo={`Total (${precio})`} valor={formatoPesos(f.total)} />}
                   </dl>
                   {f.pendiente && <p className="mt-2 text-xs text-alerta">Falta el stock final en alguna barra.</p>}
                 </Tarjeta>
@@ -145,8 +149,7 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
                   <th className="px-3 py-3">Cortesías</th>
                   <th className="px-3 py-3">Venta est.</th>
                   <th className="px-3 py-3">Por persona</th>
-                  {hayPrecios && <th className="px-3 py-3">Costo</th>}
-                  {hayPrecios && <th className="px-4 py-3">Facturación</th>}
+                  {hayPrecios && <th className="px-4 py-3">Total ({precio})</th>}
                 </tr>
               </thead>
               <tbody className="tabular divide-y divide-borde text-right">
@@ -161,8 +164,7 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
                     <td className="px-3 py-2.5">{formatoNumero(f.cortesias)}</td>
                     <td className={cx('px-3 py-2.5', f.ventaEstimada < 0 && 'text-alerta')}>{formatoNumero(f.ventaEstimada)}</td>
                     <td className="px-3 py-2.5">{f.porPersona == null ? '—' : formatoNumero(Math.round(f.porPersona * 100) / 100)}</td>
-                    {hayPrecios && <td className="px-3 py-2.5">{formatoPesos(f.costo)}</td>}
-                    {hayPrecios && <td className="px-4 py-2.5">{formatoPesos(f.facturacion)}</td>}
+                    {hayPrecios && <td className="px-4 py-2.5">{formatoPesos(f.total)}</td>}
                   </tr>
                 ))}
               </tbody>
@@ -172,16 +174,15 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
                     <td className="px-4 py-3 text-left" colSpan={6}>
                       Total
                     </td>
-                    <td className="px-3 py-3">{formatoPesos(resumen.totales.costo)}</td>
-                    <td className="px-4 py-3">{formatoPesos(resumen.totales.facturacion)}</td>
+                    <td className="px-4 py-3">{formatoPesos(resumen.totales.total)}</td>
                   </tr>
                 </tfoot>
               )}
             </table>
           </Tarjeta>
           <p className="text-xs text-suave">
-            Venta estimada = Consumido − Retiros de personal − Cortesías. Costo = Consumido × precio de costo. Facturación = Venta estimada × precio de
-            venta. Solo se calculan para artículos con precio cargado.
+            Venta estimada = Consumido − Retiros de personal − Cortesías (en unidades).
+            {hayPrecios && ` Total = Consumido × ${precio}; solo para artículos con ese precio cargado.`}
           </p>
         </>
       )}

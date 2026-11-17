@@ -1,4 +1,5 @@
 import type { DatosCaja } from './calculos/caja'
+import type { TipoBarra } from './calculos/evento'
 import type { TipoMovimiento } from './calculos/stock'
 
 export type Unidad = 'unidad' | 'bolsa'
@@ -12,7 +13,7 @@ export interface Articulo {
   unidad: Unidad
   stock_minimo: number
   precio_costo: number | null
-  precio_venta: number | null
+  precio_mayorista: number | null
   activo: boolean
   creado_en: string
   actualizado_en: string
@@ -25,7 +26,7 @@ export interface Articulo {
 
 export type ArticuloEditable = Pick<
   Articulo,
-  'nombre' | 'marca' | 'tamano' | 'unidad' | 'stock_minimo' | 'precio_costo' | 'precio_venta'
+  'nombre' | 'marca' | 'tamano' | 'unidad' | 'stock_minimo' | 'precio_costo' | 'precio_mayorista'
 >
 
 export interface Movimiento {
@@ -82,6 +83,7 @@ export interface Evento {
   personas: number
   notas: string | null
   creado_en: string
+  tipo_barra: TipoBarra
   archivado: boolean
   archivado_en: string | null
 }

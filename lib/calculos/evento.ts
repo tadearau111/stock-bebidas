@@ -107,8 +107,23 @@ export interface ArticuloPrecio {
   nombre: string
   unidad: 'unidad' | 'bolsa'
   precio_costo: number | null
-  precio_venta: number | null
+  precio_mayorista: number | null
 }
+
+/** Barra propia → se calcula con precio de costo. Barra concesionada → con precio mayorista. */
+export type TipoBarra = 'propia' | 'concesionada'
+
+export const TIPOS_BARRA: Record<TipoBarra, { nombre: string; precio: string }> = {
+  propia: { nombre: 'Barra propia', precio: 'precio costo' },
+  concesionada: { nombre: 'Barra concesionada', precio: 'precio mayorista' },
+}
+
+/** El precio que corresponde según el tipo de barra del evento. */
+export function precioSegun(a: Pick<ArticuloPrecio, 'precio_costo' | 'precio_mayorista'>, tipo: TipoBarra): number | null {
+  return tipo === 'concesionada' ? a.precio_mayorista : a.precio_costo
+}
+
+const sinPrecio = (id: string): ArticuloPrecio => ({ id, nombre: '¿?', unidad: 'unidad', precio_costo: null, precio_mayorista: null })
 
 export interface FilaResumen {
   articulo: ArticuloPrecio
@@ -117,10 +132,9 @@ export interface FilaResumen {
   pendiente: boolean // alguna barra sin stock final
   retirosPersonal: number
   cortesias: number
-  ventaEstimada: number
+  ventaEstimada: number // unidades: consumido − retiros
   porPersona: number | null
-  costo: number | null
-  facturacion: number | null
+  total: number | null // consumido × precio (costo o mayorista según el tipo de barra)
 }
 
 export interface ResumenEvento {
@@ -129,14 +143,14 @@ export interface ResumenEvento {
   totales: {
     retirosPersonal: number
     cortesias: number
-    costo: number | null
-    facturacion: number | null
+    total: number | null
   }
 }
 
 /**
  * Consumido total = Venta estimada + Retiros personal + Cortesías
- *  → Venta estimada = Consumido − Retiros.
+ *  → Venta estimada = Consumido − Retiros (en unidades).
+ * Total = Consumido × precio (costo si es barra propia, mayorista si es concesionada).
  * Solo se cuentan como consumidas las líneas con stock final cargado.
  */
 export function resumirEvento(
@@ -144,6 +158,7 @@ export function resumirEvento(
   retiros: Retiro[],
   articulos: ArticuloPrecio[],
   personas: number,
+  tipo: TipoBarra = 'propia',
 ): ResumenEvento {
   const porId = new Map(articulos.map((a) => [a.id, a]))
   const filas = new Map<string, FilaResumen>()
@@ -151,10 +166,10 @@ export function resumirEvento(
   const fila = (id: string) => {
     let f = filas.get(id)
     if (!f) {
-      const articulo = porId.get(id) ?? { id, nombre: '¿?', unidad: 'unidad' as const, precio_costo: null, precio_venta: null }
       f = {
-        articulo, llevado: 0, consumido: 0, pendiente: false, retirosPersonal: 0, cortesias: 0,
-        ventaEstimada: 0, porPersona: null, costo: null, facturacion: null,
+        articulo: porId.get(id) ?? sinPrecio(id),
+        llevado: 0, consumido: 0, pendiente: false, retirosPersonal: 0, cortesias: 0,
+        ventaEstimada: 0, porPersona: null, total: null,
       }
       filas.set(id, f)
     }
@@ -174,20 +189,16 @@ export function resumirEvento(
     else f.cortesias += r.cantidad
   }
 
-  let costoTotal: number | null = null
-  let facturacionTotal: number | null = null
+  let total: number | null = null
   let personal = 0
   let cortesias = 0
   for (const f of filas.values()) {
     f.ventaEstimada = f.consumido - f.retirosPersonal - f.cortesias
     f.porPersona = personas > 0 ? f.consumido / personas : null
-    if (f.articulo.precio_costo != null) {
-      f.costo = f.consumido * f.articulo.precio_costo
-      costoTotal = (costoTotal ?? 0) + f.costo
-    }
-    if (f.articulo.precio_venta != null) {
-      f.facturacion = Math.max(f.ventaEstimada, 0) * f.articulo.precio_venta
-      facturacionTotal = (facturacionTotal ?? 0) + f.facturacion
+    const precio = precioSegun(f.articulo, tipo)
+    if (precio != null) {
+      f.total = f.consumido * precio
+      total = (total ?? 0) + f.total
     }
     personal += f.retirosPersonal
     cortesias += f.cortesias
@@ -196,7 +207,7 @@ export function resumirEvento(
   return {
     filas: [...filas.values()].sort((a, b) => a.articulo.nombre.localeCompare(b.articulo.nombre, 'es')),
     barrasSinFinal: lineas.filter((l) => l.stock_final == null).length,
-    totales: { retirosPersonal: personal, cortesias, costo: costoTotal, facturacion: facturacionTotal },
+    totales: { retirosPersonal: personal, cortesias, total },
   }
 }
 
@@ -213,80 +224,64 @@ export interface RetiroConBarra extends Retiro {
 export interface FilaCosto {
   articulo: ArticuloPrecio
   consumido: number
-  retiros: number // personal + cortesías (no se venden)
-  vendido: number // consumido − retiros
   pendiente: boolean // falta el stock final
-  totalCosto: number | null // consumido × precio de costo
-  totalVenta: number | null // vendido × precio de venta
+  precio: number | null // costo o mayorista, según el tipo de barra
+  total: number | null // consumido × precio
 }
 
 export interface CostosBarra {
   barra_id: string
   filas: FilaCosto[]
-  totalCosto: number
-  totalVenta: number
+  total: number
 }
 
 export interface CostosEvento {
+  tipo: TipoBarra
   barras: CostosBarra[]
-  totalCosto: number
-  totalVenta: number
-  diferencia: number // venta − costo
-  sinPrecioCosto: string[] // nombres de artículos consumidos sin precio de costo
-  sinPrecioVenta: string[]
+  total: number
+  sinPrecio: string[] // artículos consumidos sin el precio que corresponde
   lineasPendientes: number
 }
 
 /**
- * Costo = lo consumido en la barra × precio de costo (todo lo que salió cuesta,
- * también lo del personal y las cortesías).
- * Venta = lo vendido (consumido − retiros) × precio de venta.
- * Ejemplo: 10 cocas a $1 de costo y $2 de venta → costo $10, venta $20.
+ * Total de cada barra y del evento = lo consumido × el precio que corresponde:
+ *  · barra propia → precio de costo
+ *  · barra concesionada → precio mayorista
+ * Ejemplo: 10 cocas consumidas a $1 de costo → barra propia: $10.
  */
 export function costosDelEvento(
   barras: { id: string }[],
   lineas: LineaConBarra[],
-  retiros: RetiroConBarra[],
+  _retiros: RetiroConBarra[],
   articulos: ArticuloPrecio[],
+  tipo: TipoBarra = 'propia',
 ): CostosEvento {
   const porId = new Map(articulos.map((a) => [a.id, a]))
-  const sinCosto = new Set<string>()
-  const sinVenta = new Set<string>()
-  let totalCosto = 0
-  let totalVenta = 0
+  const faltan = new Set<string>()
+  let total = 0
 
   const resultado = barras.map((b) => {
     const filas: FilaCosto[] = lineas
       .filter((l) => l.barra_id === b.id)
       .map((l) => {
-        const articulo = porId.get(l.articulo_id) ?? { id: l.articulo_id, nombre: '¿?', unidad: 'unidad' as const, precio_costo: null, precio_venta: null }
+        const articulo = porId.get(l.articulo_id) ?? sinPrecio(l.articulo_id)
         const c = consumido(l)
         const cons = c ?? 0
-        const ret = retiros
-          .filter((r) => r.barra_id === b.id && r.articulo_id === l.articulo_id)
-          .reduce((t, r) => t + r.cantidad, 0)
-        const vendido = Math.max(cons - ret, 0)
-        const totalCostoFila = articulo.precio_costo == null ? null : cons * articulo.precio_costo
-        const totalVentaFila = articulo.precio_venta == null ? null : vendido * articulo.precio_venta
-        if (cons > 0 && articulo.precio_costo == null) sinCosto.add(articulo.nombre)
-        if (vendido > 0 && articulo.precio_venta == null) sinVenta.add(articulo.nombre)
-        return { articulo, consumido: cons, retiros: ret, vendido, pendiente: c == null, totalCosto: totalCostoFila, totalVenta: totalVentaFila }
+        const precio = precioSegun(articulo, tipo)
+        if (cons > 0 && precio == null) faltan.add(articulo.nombre)
+        return { articulo, consumido: cons, pendiente: c == null, precio, total: precio == null ? null : cons * precio }
       })
       .sort((x, y) => x.articulo.nombre.localeCompare(y.articulo.nombre, 'es'))
-    const tc = filas.reduce((t, f) => t + (f.totalCosto ?? 0), 0)
-    const tv = filas.reduce((t, f) => t + (f.totalVenta ?? 0), 0)
-    totalCosto += tc
-    totalVenta += tv
-    return { barra_id: b.id, filas, totalCosto: tc, totalVenta: tv }
+    const tb = filas.reduce((t, f) => t + (f.total ?? 0), 0)
+    total += tb
+    return { barra_id: b.id, filas, total: tb }
   })
 
   return {
+    tipo,
     barras: resultado,
-    totalCosto,
-    totalVenta,
-    diferencia: totalVenta - totalCosto,
-    sinPrecioCosto: [...sinCosto].sort(),
-    sinPrecioVenta: [...sinVenta].sort(),
+    total,
+    sinPrecio: [...faltan].sort(),
     lineasPendientes: lineas.filter((l) => l.stock_final == null).length,
   }
 }
