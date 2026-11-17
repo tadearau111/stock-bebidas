@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { FormAjuste, FormArticulo, FormIngreso } from '@/components/deposito/formularios'
-import { ListaTragos } from '@/components/deposito/Tragos'
+import { ListaProveedores, ListaTragos } from '@/components/deposito/Tragos'
 import { BotonesExportar } from '@/components/Exportar'
 import { reporteDeposito, reporteFaltantes } from '@/lib/exportar/reportes'
 import { IconoBuscar } from '@/components/marca'
@@ -22,6 +22,7 @@ type Accion =
   | { tipo: 'ajuste'; articulo: Articulo }
   | { tipo: 'opciones'; articulo: Articulo }
   | { tipo: 'tragos' }
+  | { tipo: 'proveedores' }
   | null
 
 export default function PaginaDeposito() {
@@ -61,6 +62,11 @@ export default function PaginaDeposito() {
           <Boton variante="secundario" onClick={() => setExportando((v) => !v)}>
             Exportar
           </Boton>
+          {(puede('ingresos.cargar') || puede('articulos.editar')) && (
+            <Boton variante="secundario" onClick={() => setAccion({ tipo: 'proveedores' })}>
+              Proveedores
+            </Boton>
+          )}
           {puede('articulos.editar') && (
             <Boton variante="secundario" onClick={() => setAccion({ tipo: 'tragos' })}>
               Tragos
@@ -202,6 +208,9 @@ export default function PaginaDeposito() {
         </>
       )}
 
+      <Ventana abierta={accion?.tipo === 'proveedores'} alCerrar={() => cerrar()} titulo="Proveedores">
+        {accion?.tipo === 'proveedores' && <ListaProveedores />}
+      </Ventana>
       <Ventana abierta={accion?.tipo === 'tragos'} alCerrar={() => cerrar()} titulo="Tragos y vasos">
         {accion?.tipo === 'tragos' && <ListaTragos />}
       </Ventana>

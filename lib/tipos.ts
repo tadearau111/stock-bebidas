@@ -38,8 +38,17 @@ export interface Movimiento {
   fecha: string
   creado_por: string | null
   creado_en: string
+  proveedor_id: string | null
   articulo?: { nombre: string; unidad: Unidad } | null
+  proveedor?: { nombre: string } | null
   autor?: { nombre: string } | null
+}
+
+export interface Proveedor {
+  id: string
+  local_id: string
+  nombre: string
+  activo: boolean
 }
 
 export interface AccesoLocal {

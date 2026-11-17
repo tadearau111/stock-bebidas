@@ -18,11 +18,13 @@ export interface Nombres {
   eventos: Map<string, string>
   roles: Map<string, string>
   tragos?: Map<string, string>
+  proveedores?: Map<string, string>
 }
 
 const SUJETOS: Record<string, string> = {
   articulos: 'artículo',
   tragos: 'trago o vaso',
+  proveedores: 'proveedor',
   evento_caja: 'caja del evento',
   evento_gastos: 'gasto de la noche',
   movimientos: 'movimiento del depósito',
@@ -40,7 +42,7 @@ const SUJETOS: Record<string, string> = {
 }
 
 export const AREAS: Record<string, string[]> = {
-  'Depósito y artículos': ['articulos', 'movimientos', 'tragos'],
+  'Depósito y artículos': ['articulos', 'movimientos', 'tragos', 'proveedores'],
   Eventos: ['eventos', 'barras', 'barra_articulos', 'reposiciones', 'retiros', 'bebida_abierta', 'evento_asignaciones'],
   Caja: ['evento_caja', 'evento_gastos'],
   'Usuarios y permisos': ['perfiles', 'miembros', 'roles', 'rol_permisos'],
@@ -73,6 +75,7 @@ const CAMPOS: Record<string, string> = {
   usuario_id: 'Usuario',
   articulo_id: 'Artículo',
   trago_id: 'Trago',
+  proveedor_id: 'Proveedor',
   evento_id: 'Evento',
   permiso_codigo: 'Permiso',
   efectivo_real: 'Efectivo real',
@@ -116,6 +119,7 @@ export function formatoValor(campo: string, valor: unknown, nombres?: Nombres): 
     if (campo === 'evento_id') return nombres.eventos.get(texto) ?? 'evento'
     if (campo === 'rol_id') return nombres.roles.get(texto) ?? 'rol'
     if (campo === 'trago_id') return nombres.tragos?.get(texto) ?? 'trago'
+    if (campo === 'proveedor_id') return nombres.proveedores?.get(texto) ?? 'proveedor'
   }
   if (campo === 'hora' || (campo === 'fecha' && texto.includes('T'))) return fmtFechaHora.format(new Date(texto))
   if (campo === 'fecha' && /^\d{4}-\d{2}-\d{2}$/.test(texto)) return texto.split('-').reverse().join('/')

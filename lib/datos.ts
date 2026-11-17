@@ -63,21 +63,22 @@ export function useBorrarArticulo() {
 
 // ---------------------------------------------------------------- Movimientos
 
-export function useMovimientos(filtro: { articuloId?: string; limite?: number } = {}) {
+export function useMovimientos(filtro: { articuloId?: string; proveedorId?: string; limite?: number } = {}) {
   const localId = useLocalId()
-  const { articuloId, limite = 200 } = filtro
+  const { articuloId, proveedorId, limite = 200 } = filtro
   return useQuery({
-    queryKey: ['movimientos', localId, articuloId ?? null, limite],
+    queryKey: ['movimientos', localId, articuloId ?? null, proveedorId ?? null, limite],
     enabled: !!localId,
     queryFn: async () => {
       let q = supabase()
         .from('movimientos')
-        .select('*, articulo:articulos(nombre, unidad), autor:perfiles(nombre)')
+        .select('*, articulo:articulos(nombre, unidad), proveedor:proveedores(nombre), autor:perfiles(nombre)')
         .eq('local_id', localId)
         .order('fecha', { ascending: false })
         .order('creado_en', { ascending: false })
         .limit(limite)
       if (articuloId) q = q.eq('articulo_id', articuloId)
+      if (proveedorId) q = q.eq('proveedor_id', proveedorId)
       return lanzar(await q) as Movimiento[]
     },
   })
@@ -89,6 +90,7 @@ export interface NuevoMovimiento {
   cantidad: number
   motivo?: string | null
   fecha?: string
+  proveedor_id?: string | null
 }
 
 export function useCargarMovimientos() {
@@ -114,8 +116,8 @@ export function useCargarMovimientos() {
 export function useCorregirMovimiento() {
   const refrescar = useRefrescarDeposito()
   return useMutation({
-    mutationFn: async ({ id, cantidad, motivo }: { id: string; cantidad: number; motivo: string | null }) => {
-      lanzar(await supabase().from('movimientos').update({ cantidad, motivo }).eq('id', id).select('id').single())
+    mutationFn: async ({ id, ...cambios }: { id: string; cantidad: number; motivo: string | null; proveedor_id?: string | null }) => {
+      lanzar(await supabase().from('movimientos').update(cambios).eq('id', id).select('id').single())
     },
     onSuccess: refrescar,
   })

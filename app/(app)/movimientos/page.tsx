@@ -4,7 +4,9 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useState, type FormEvent } from 'react'
 import { Aviso, Boton, Campo, Cargando, Etiqueta, Selector, Tarjeta, Ventana, cx } from '@/components/ui'
 import { esCantidadValida } from '@/lib/calculos/stock'
+import { ElegirProveedor } from '@/components/deposito/formularios'
 import { useAnularMovimiento, useArticulos, useCorregirMovimiento, useMovimientos } from '@/lib/datos'
+import { useProveedores } from '@/lib/proveedores'
 import { formatoCantidad, formatoFechaHora, mensajeError } from '@/lib/formato'
 import { useSesion } from '@/lib/sesion'
 import type { Movimiento } from '@/lib/tipos'
@@ -23,10 +25,21 @@ function Movimientos() {
   const ruta = usePathname()
   const params = useSearchParams()
   const articuloId = params.get('articulo') ?? ''
+  const proveedorId = params.get('proveedor') ?? ''
+  const irA = (cambios: Record<string, string>) => {
+    const q = new URLSearchParams(params.toString())
+    for (const [k, v] of Object.entries(cambios)) {
+      if (v) q.set(k, v)
+      else q.delete(k)
+    }
+    const texto = q.toString()
+    router.replace(texto ? `${ruta}?${texto}` : ruta)
+  }
   const [tipo, setTipo] = useState<'' | 'ingreso' | 'ajuste'>('')
   const [corrigiendo, setCorrigiendo] = useState<Movimiento | null>(null)
   const { data: articulos } = useArticulos()
-  const { data: movimientos, isPending, error } = useMovimientos({ articuloId: articuloId || undefined })
+  const { data: proveedores } = useProveedores()
+  const { data: movimientos, isPending, error } = useMovimientos({ articuloId: articuloId || undefined, proveedorId: proveedorId || undefined })
 
   const lista = (movimientos ?? []).filter((m) => !tipo || m.tipo === tipo)
   const articulo = articulos?.find((a) => a.id === articuloId)
@@ -40,12 +53,8 @@ function Movimientos() {
         <p className="text-sm text-suave">Ingresos de compras y ajustes manuales. El stock se calcula a partir de esta lista.</p>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Selector
-          etiqueta="Artículo"
-          value={articuloId}
-          onChange={(e) => router.replace(e.target.value ? `${ruta}?articulo=${e.target.value}` : ruta)}
-        >
+      <div className="grid gap-2 sm:grid-cols-3">
+        <Selector etiqueta="Artículo" value={articuloId} onChange={(e) => irA({ articulo: e.target.value })}>
           <option value="">Todos los artículos</option>
           {(articulos ?? []).map((a) => (
             <option key={a.id} value={a.id}>
@@ -57,6 +66,14 @@ function Movimientos() {
           <option value="">Ingresos y ajustes</option>
           <option value="ingreso">Solo ingresos</option>
           <option value="ajuste">Solo ajustes</option>
+        </Selector>
+        <Selector etiqueta="Proveedor" value={proveedorId} onChange={(e) => irA({ proveedor: e.target.value })}>
+          <option value="">Todos los proveedores</option>
+          {(proveedores ?? []).map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nombre}
+            </option>
+          ))}
         </Selector>
       </div>
 
@@ -81,7 +98,8 @@ function Movimientos() {
                   {m.articulo?.nombre ?? '—'}{' '}
                   <Etiqueta color={m.tipo === 'ingreso' ? 'verde' : 'gris'}>{m.tipo === 'ingreso' ? 'Ingreso' : 'Ajuste'}</Etiqueta>
                 </p>
-                {m.motivo && <p className="text-sm text-suave">Motivo: {m.motivo}</p>}
+                {m.proveedor && <p className="text-sm text-suave">Proveedor: {m.proveedor.nombre}</p>}
+                {m.motivo && <p className="text-sm text-suave">{m.tipo === 'ingreso' ? 'Nota' : 'Motivo'}: {m.motivo}</p>}
                 <p className="text-xs text-suave">
                   {formatoFechaHora(m.fecha)} · {m.autor?.nombre ?? 'Usuario'}
                 </p>
@@ -114,6 +132,7 @@ function FormCorregir({ movimiento: m, alTerminar }: { movimiento: Movimiento; a
   const anular = useAnularMovimiento()
   const [cantidad, setCantidad] = useState(String(m.cantidad))
   const [motivo, setMotivo] = useState(m.motivo ?? '')
+  const [proveedorId, setProveedorId] = useState(m.proveedor_id ?? '')
   const [error, setError] = useState('')
   const esIngreso = m.tipo === 'ingreso'
 
@@ -126,7 +145,7 @@ function FormCorregir({ movimiento: m, alTerminar }: { movimiento: Movimiento; a
     }
     if (!esIngreso && !motivo.trim()) return setError('El motivo es obligatorio en los ajustes.')
     try {
-      await corregir.mutateAsync({ id: m.id, cantidad: n, motivo: motivo.trim() || null })
+      await corregir.mutateAsync({ id: m.id, cantidad: n, motivo: motivo.trim() || null, ...(esIngreso ? { proveedor_id: proveedorId || null } : {}) })
       alTerminar()
     } catch (err) {
       setError(mensajeError(err))
@@ -160,6 +179,7 @@ function FormCorregir({ movimiento: m, alTerminar }: { movimiento: Movimiento; a
         onChange={(e) => setCantidad(e.target.value)}
       />
       <Campo etiqueta={esIngreso ? 'Nota (opcional)' : 'Motivo *'} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+      {esIngreso && <ElegirProveedor valor={proveedorId} alCambiar={setProveedorId} />}
       <Aviso tipo="info">El cambio queda registrado en el historial con el valor anterior y el nuevo.</Aviso>
       {error && <Aviso>{error}</Aviso>}
       <div className="flex gap-2">

@@ -4,6 +4,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Aviso, Boton, Campo, Selector, cx } from '@/components/ui'
 import { ajustePorConteo, coincideBusqueda, esCantidadValida } from '@/lib/calculos/stock'
 import { useCargarMovimientos, useGuardarArticulo } from '@/lib/datos'
+import { useGuardarProveedor, useProveedores } from '@/lib/proveedores'
 import { ahoraParaInput, detalleArticulo, formatoCantidad, leerPrecio, mensajeError } from '@/lib/formato'
 import type { Articulo, Unidad } from '@/lib/tipos'
 
@@ -172,6 +173,7 @@ export function FormIngreso({
   const cargar = useCargarMovimientos()
   const [lineas, setLineas] = useState<LineaIngreso[]>([{ clave: 1, articulo: inicial ?? null, cantidad: '' }])
   const [fecha, setFecha] = useState(ahoraParaInput())
+  const [proveedorId, setProveedorId] = useState('')
   const [error, setError] = useState('')
 
   const cambiar = (clave: number, cambios: Partial<LineaIngreso>) =>
@@ -191,6 +193,7 @@ export function FormIngreso({
         completas.map((l) => ({
           articulo_id: l.articulo!.id,
           tipo: 'ingreso' as const,
+          proveedor_id: proveedorId || null,
           cantidad: Number(l.cantidad),
           fecha: new Date(fecha).toISOString(),
         })),
@@ -204,6 +207,7 @@ export function FormIngreso({
   return (
     <form onSubmit={enviar} className="space-y-4">
       <p className="text-sm text-suave">Cargá lo que compraste, siempre en unidades (o bolsas para el hielo).</p>
+      <ElegirProveedor valor={proveedorId} alCambiar={setProveedorId} />
       {lineas.map((l, i) => (
         <div key={l.clave} className="space-y-2 rounded-xl border border-borde p-3">
           <div className="flex items-center justify-between">
@@ -346,5 +350,81 @@ export function FormAjuste({ articulo, alTerminar }: { articulo: Articulo; alTer
         </Boton>
       </div>
     </form>
+  )
+}
+
+// =================================================================== Proveedor
+
+/** Elegir un proveedor de la lista o agregar uno nuevo en el momento. Opcional. */
+export function ElegirProveedor({ valor, alCambiar }: { valor: string; alCambiar: (id: string) => void }) {
+  const { data: proveedores } = useProveedores()
+  const guardar = useGuardarProveedor()
+  const [nuevo, setNuevo] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  const opciones = (proveedores ?? []).filter((p) => p.activo || p.id === valor)
+
+  async function agregar() {
+    if (!nuevo?.trim()) return
+    setError('')
+    // si ya existe con ese nombre, se elige ese
+    const existente = proveedores?.find((p) => p.nombre.trim().toLowerCase() === nuevo.trim().toLowerCase())
+    if (existente) {
+      alCambiar(existente.id)
+      setNuevo(null)
+      return
+    }
+    try {
+      const p = await guardar.mutateAsync({ nombre: nuevo.trim() })
+      alCambiar(p.id)
+      setNuevo(null)
+    } catch (e) {
+      setError(mensajeError(e))
+    }
+  }
+
+  return (
+    <div>
+      {nuevo == null ? (
+        <>
+          <Selector etiqueta="Proveedor (opcional)" value={valor} onChange={(e) => alCambiar(e.target.value)}>
+            <option value="">Sin proveedor</option>
+            {opciones.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nombre}
+              </option>
+            ))}
+          </Selector>
+          <button type="button" onClick={() => setNuevo('')} className="mt-1 text-sm text-marca-700 underline">
+            + Nuevo proveedor
+          </button>
+        </>
+      ) : (
+        <div>
+          <label className="mb-1 block text-sm font-medium">Nuevo proveedor</label>
+          <div className="flex gap-2">
+            <input
+              value={nuevo}
+              onChange={(e) => setNuevo(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  agregar()
+                }
+              }}
+              placeholder="Ej: Distribuidora Norte"
+              autoFocus
+              className="min-h-11 w-full flex-1 rounded-lg border border-borde bg-superficie px-3 outline-none focus:border-marca-500"
+            />
+            <Boton variante="secundario" onClick={agregar} cargando={guardar.isPending}>
+              Agregar
+            </Boton>
+          </div>
+          <button type="button" onClick={() => setNuevo(null)} className="mt-1 text-sm text-suave underline">
+            Cancelar
+          </button>
+        </div>
+      )}
+      {error && <div className="mt-2"><Aviso>{error}</Aviso></div>}
+    </div>
   )
 }
