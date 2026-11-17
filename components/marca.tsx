@@ -148,3 +148,12 @@ export const IconoPapelera = (p: Icono) => (
     <path d="M10 11v6M14 11v6" />
   </Base>
 )
+
+export const IconoCajaFuerte = (p: Icono) => (
+  <Base {...p}>
+    <rect x="3" y="4" width="18" height="15" rx="2" />
+    <circle cx="12" cy="11.5" r="3.2" />
+    <path d="M12 8.3v1M12 13.7v1M8.8 11.5h1M14.2 11.5h1" />
+    <path d="M6 19v2M18 19v2" />
+  </Base>
+)

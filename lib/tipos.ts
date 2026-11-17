@@ -70,6 +70,7 @@ export type Permiso =
   | 'info.ver'
   | 'info.editar'
   | 'papelera.gestionar'
+  | 'caja_fuerte.gestionar'
 
 // ------------------------------------------------------------------ Eventos
 

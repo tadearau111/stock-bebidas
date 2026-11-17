@@ -26,6 +26,7 @@ const SUJETOS: Record<string, string> = {
   tragos: 'trago o vaso',
   proveedores: 'proveedor',
   notas_info: 'nota de Info',
+  caja_fuerte_movimientos: 'movimiento de caja fuerte',
   evento_caja: 'caja del evento',
   evento_gastos: 'gasto de la noche',
   movimientos: 'movimiento del depósito',
@@ -45,7 +46,7 @@ const SUJETOS: Record<string, string> = {
 export const AREAS: Record<string, string[]> = {
   'Depósito y artículos': ['articulos', 'movimientos', 'tragos', 'proveedores'],
   Eventos: ['eventos', 'barras', 'barra_articulos', 'reposiciones', 'retiros', 'bebida_abierta', 'evento_asignaciones'],
-  Caja: ['evento_caja', 'evento_gastos'],
+  Caja: ['evento_caja', 'evento_gastos', 'caja_fuerte_movimientos'],
   Info: ['notas_info'],
   'Usuarios y permisos': ['perfiles', 'miembros', 'roles', 'rol_permisos'],
 }

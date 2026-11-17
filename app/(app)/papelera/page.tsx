@@ -17,6 +17,7 @@ const TIPOS: Record<TipoPapelera, string> = {
   movimiento: 'Depósito',
   nota: 'Info',
   articulo: 'Artículo',
+  caja_fuerte: 'Caja fuerte',
 }
 
 export default function PaginaPapelera() {
