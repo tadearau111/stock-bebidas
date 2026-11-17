@@ -67,6 +67,8 @@ export type Permiso =
   | 'eventos.cargar'
   | 'usuarios.gestionar'
   | 'historial.ver'
+  | 'info.ver'
+  | 'info.editar'
 
 // ------------------------------------------------------------------ Eventos
 
@@ -161,4 +163,20 @@ export interface DetalleEvento {
   bebidaAbierta: BebidaAbiertaDB[]
   caja: CajaDB | null
   gastos: GastoDB[]
+}
+
+// ------------------------------------------------------------------ Info
+
+export interface NotaInfo {
+  id: string
+  local_id: string
+  fecha: string
+  evento_id: string | null
+  titulo: string
+  hora_apertura: string | null // "21:00:00"
+  hora_cierre: string | null
+  personal: { rol: string; cantidad: number | null; detalle: string }[]
+  notas: string | null
+  actualizado_en: string
+  evento?: { nombre: string } | null
 }

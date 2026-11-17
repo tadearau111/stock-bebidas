@@ -25,6 +25,7 @@ const SUJETOS: Record<string, string> = {
   articulos: 'artículo',
   tragos: 'trago o vaso',
   proveedores: 'proveedor',
+  notas_info: 'nota de Info',
   evento_caja: 'caja del evento',
   evento_gastos: 'gasto de la noche',
   movimientos: 'movimiento del depósito',
@@ -45,6 +46,7 @@ export const AREAS: Record<string, string[]> = {
   'Depósito y artículos': ['articulos', 'movimientos', 'tragos', 'proveedores'],
   Eventos: ['eventos', 'barras', 'barra_articulos', 'reposiciones', 'retiros', 'bebida_abierta', 'evento_asignaciones'],
   Caja: ['evento_caja', 'evento_gastos'],
+  Info: ['notas_info'],
   'Usuarios y permisos': ['perfiles', 'miembros', 'roles', 'rol_permisos'],
 }
 
@@ -89,6 +91,10 @@ const CAMPOS: Record<string, string> = {
   cambio_proxima_caja: 'Cambio próxima caja',
   vasos_no_devueltos: 'Vasos no devueltos',
   monto: 'Monto',
+  titulo: 'Título',
+  hora_apertura: 'Apertura',
+  hora_cierre: 'Cierre',
+  personal: 'Personal',
   detalle: 'Detalle',
 }
 
@@ -111,6 +117,9 @@ const CAMPOS_PESOS = new Set([
 export function formatoValor(campo: string, valor: unknown, nombres?: Nombres): string {
   if (valor == null || valor === '') return '—'
   if (typeof valor === 'boolean') return valor ? 'Sí' : 'No'
+  if (campo === 'personal' && Array.isArray(valor)) {
+    return (valor as { rol: string; cantidad: number | null }[]).map((p) => `${p.rol}${p.cantidad != null ? ` ${p.cantidad}` : ''}`).join(', ') || '—'
+  }
   const texto = String(valor)
   if (VALORES[campo]?.[texto]) return VALORES[campo][texto]
   if (nombres) {

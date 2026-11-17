@@ -131,3 +131,11 @@ export const IconoMas = (p: Icono) => (
     <circle cx="19" cy="12" r="1.4" />
   </Base>
 )
+
+export const IconoInfo = (p: Icono) => (
+  <Base {...p}>
+    <path d="M6 3h9l4 4v14H6z" />
+    <path d="M14 3v5h5" />
+    <path d="M9 12h7M9 16h5" />
+  </Base>
+)

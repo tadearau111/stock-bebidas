@@ -1,5 +1,5 @@
 import type { ReactNode, SVGProps } from 'react'
-import { IconoDeposito, IconoEventos, IconoHistorial, IconoInicio, IconoMovimientos, IconoUsuarios } from '@/components/marca'
+import { IconoDeposito, IconoEventos, IconoHistorial, IconoInfo, IconoInicio, IconoMovimientos, IconoUsuarios } from '@/components/marca'
 import type { Permiso } from '@/lib/tipos'
 
 export interface Seccion {
@@ -13,6 +13,7 @@ export interface Seccion {
 export const secciones: Seccion[] = [
   { href: '/', etiqueta: 'Inicio', Icono: IconoInicio },
   { href: '/eventos', etiqueta: 'Eventos', Icono: IconoEventos, activaEn: ['/evento'] },
+  { href: '/info', etiqueta: 'Info', Icono: IconoInfo, permiso: 'info.ver' },
   { href: '/deposito', etiqueta: 'Depósito', Icono: IconoDeposito, permiso: 'deposito.ver' },
   { href: '/movimientos', etiqueta: 'Movimientos', Icono: IconoMovimientos, permiso: 'deposito.ver' },
   { href: '/usuarios', etiqueta: 'Usuarios', Icono: IconoUsuarios, permiso: 'usuarios.gestionar' },
