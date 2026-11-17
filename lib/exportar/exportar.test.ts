@@ -101,14 +101,26 @@ describe('Resumen de evento', () => {
     expect(r.textoWhatsApp).toContain('• Juan: Coca Cola 2 u.')
     // Coca: barra 1 consumió 10, VIP 10 → 20; personal 2 → venta 18
     expect(r.secciones[0].filas[0]).toEqual(['Coca Cola', 20, 2, 0, 18, 0.2])
+    // Cada barra muestra de dónde sale el costo: consumido x precio
+    const barra1 = r.secciones.find((s) => s.titulo === 'Barra 1')!
+    expect(barra1.filas[0]).toEqual(['Coca Cola', 12, 0, 2, 10, 2, 8, 1, 10, 2, 16])
+    expect(barra1.total).toEqual(['Total Barra 1', null, null, null, null, null, null, null, 10, null, 16])
+    const vip = r.secciones.find((s) => s.titulo === 'Barra VIP')!
+    expect(vip.filas[0]).toEqual(['Coca Cola', 5, 5, 0, 10, 0, 10, 1, 10, 2, 20])
+    // Costos: resumen por barra y total general
     const costos = r.secciones.find((s) => s.titulo === 'Costos')!
-    expect(costos.total).toEqual(['Total', null, null, null, 20, null, null, 36])
+    expect(costos.filas).toEqual([
+      ['Barra 1', 10, 16, 6],
+      ['Barra VIP', 10, 20, 10],
+    ])
+    expect(costos.total).toEqual(['Total general', 20, 36, 16])
     expect(r.textoWhatsApp).toContain('*Total costo:* $ 20,00')
     expect(r.nombreArchivo).toBe('evento-casamiento-garcia-2026-11-20')
   })
   it('sin costos (para quien no gestiona eventos) no muestra precios', () => {
     const r = reporteEvento(detalle, articulos, { incluirCostos: false })
     expect(r.secciones.some((s) => s.titulo === 'Costos')).toBe(false)
+    expect(r.secciones.find((s) => s.titulo === 'Barra 1')!.columnas.map((c) => c.titulo)).toEqual(['Artículo', 'Stock inicial', 'Reposiciones', 'Stock final', 'Consumido'])
     expect(r.textoWhatsApp).not.toContain('$')
     expect(r.datos.some((d) => d[0].includes('precio'))).toBe(false)
   })

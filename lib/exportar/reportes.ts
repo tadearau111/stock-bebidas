@@ -233,6 +233,24 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
 
   for (const b of barras) {
     const ls = lineas.filter((l) => l.barra_id === b.id)
+    if (!opciones.incluirCostos) {
+      secciones.push({
+        titulo: b.nombre,
+        columnas: [
+          { titulo: 'Artículo' },
+          { titulo: 'Stock inicial', tipo: 'numero' },
+          { titulo: 'Reposiciones', tipo: 'numero' },
+          { titulo: 'Stock final', tipo: 'numero' },
+          { titulo: 'Consumido', tipo: 'numero' },
+        ],
+        filas: ls.map((l) => [l.articulo.nombre, l.stock_inicial, totalReposiciones(l), l.stock_final, consumido(l)]),
+        nota: ls.length === 0 ? 'Sin artículos.' : undefined,
+      })
+      continue
+    }
+    // Con costos: la cuenta completa de la barra, de lo consumido al costo y la venta
+    const cb = costos.barras.find((x) => x.barra_id === b.id)
+    const filaCosto = (articuloId: string) => cb?.filas.find((f) => f.articulo.id === articuloId)
     secciones.push({
       titulo: b.nombre,
       columnas: [
@@ -241,9 +259,36 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
         { titulo: 'Reposiciones', tipo: 'numero' },
         { titulo: 'Stock final', tipo: 'numero' },
         { titulo: 'Consumido', tipo: 'numero' },
+        { titulo: 'Retiros', tipo: 'numero' },
+        { titulo: 'Vendido', tipo: 'numero' },
+        { titulo: 'Precio costo', tipo: 'pesos' },
+        { titulo: 'Total costo', tipo: 'pesos' },
+        { titulo: 'Precio venta', tipo: 'pesos' },
+        { titulo: 'Total venta', tipo: 'pesos' },
       ],
-      filas: ls.map((l) => [l.articulo.nombre, l.stock_inicial, totalReposiciones(l), l.stock_final, consumido(l)]),
-      nota: ls.length === 0 ? 'Sin artículos.' : undefined,
+      filas: ls.map((l) => {
+        const f = filaCosto(l.articulo_id)
+        return [
+          l.articulo.nombre,
+          l.stock_inicial,
+          totalReposiciones(l),
+          l.stock_final,
+          consumido(l),
+          f?.retiros ?? 0,
+          f && !f.pendiente ? f.vendido : null,
+          f?.articulo.precio_costo ?? null,
+          f?.totalCosto ?? null,
+          f?.articulo.precio_venta ?? null,
+          f?.totalVenta ?? null,
+        ]
+      }),
+      resaltar: ls.map((l, i) => (l.stock_final == null ? i : -1)).filter((i) => i >= 0),
+      total: ls.length ? [`Total ${b.nombre}`, null, null, null, null, null, null, null, cb?.totalCosto ?? 0, null, cb?.totalVenta ?? 0] : undefined,
+      nota:
+        ls.length === 0
+          ? 'Sin artículos.'
+          : 'Consumido = Stock inicial + Reposiciones - Stock final. Vendido = Consumido - Retiros (botellas). Total costo = Consumido x Precio costo. Total venta = Vendido x Precio venta.' +
+            (ls.some((l) => l.stock_final == null) ? ' En rojo: falta el stock final (no se cuenta).' : ''),
     })
   }
 
@@ -292,21 +337,13 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
   if (opciones.incluirCostos) {
     secciones.push({
       titulo: 'Costos',
-      columnas: [
-        { titulo: 'Barra' },
-        { titulo: 'Artículo' },
-        { titulo: 'Consumido', tipo: 'numero' },
-        { titulo: 'Precio costo', tipo: 'pesos' },
-        { titulo: 'Total costo', tipo: 'pesos' },
-        { titulo: 'Vendido', tipo: 'numero' },
-        { titulo: 'Precio venta', tipo: 'pesos' },
-        { titulo: 'Total venta', tipo: 'pesos' },
-      ],
-      filas: costos.barras.flatMap((b) =>
-        b.filas.map((f) => [nombreBarra(b.barra_id), f.articulo.nombre, f.consumido, f.articulo.precio_costo, f.totalCosto, f.vendido, f.articulo.precio_venta, f.totalVenta]),
-      ),
-      total: ['Total', null, null, null, costos.totalCosto, null, null, costos.totalVenta],
-      nota: 'Costo = consumido x precio de costo. Venta = vendido (consumido - retiros) x precio de venta.',
+      columnas: [{ titulo: 'Barra' }, { titulo: 'Total costo', tipo: 'pesos' }, { titulo: 'Total venta', tipo: 'pesos' }, { titulo: 'Diferencia', tipo: 'pesos' }],
+      filas: costos.barras.map((b) => [nombreBarra(b.barra_id), b.totalCosto, b.totalVenta, b.totalVenta - b.totalCosto]),
+      total: ['Total general', costos.totalCosto, costos.totalVenta, costos.diferencia],
+      nota:
+        'El detalle de cada barra (cantidades consumidas, precios y totales por artículo) está en la sección de cada barra.' +
+        (costos.sinPrecioCosto.length ? ` Sin precio de costo (no se suman): ${costos.sinPrecioCosto.join(', ')}.` : '') +
+        (costos.sinPrecioVenta.length ? ` Sin precio de venta (no se suman): ${costos.sinPrecioVenta.join(', ')}.` : ''),
     })
   }
 
