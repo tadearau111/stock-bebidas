@@ -17,11 +17,16 @@ export default function PaginaEventos() {
   const { data: eventos, isPending, error } = useEventos()
   const [busqueda, setBusqueda] = useState('')
   const [nuevo, setNuevo] = useState(false)
+  const [verArchivados, setVerArchivados] = useState(false)
 
   const lista = useMemo(
-    () => (eventos ?? []).filter((e) => coincideBusqueda(busqueda, [e.nombre, formatoFechaEvento(e.fecha), e.fecha])),
-    [eventos, busqueda],
+    () =>
+      (eventos ?? [])
+        .filter((e) => e.archivado === verArchivados)
+        .filter((e) => coincideBusqueda(busqueda, [e.nombre, formatoFechaEvento(e.fecha), e.fecha])),
+    [eventos, busqueda, verArchivados],
   )
+  const cantidadArchivados = (eventos ?? []).filter((e) => e.archivado).length
 
   return (
     <div className="space-y-4">
@@ -41,13 +46,37 @@ export default function PaginaEventos() {
         />
       </div>
 
+      <div className="grid w-full grid-cols-2 gap-1 rounded-lg border border-borde bg-superficie p-1 text-sm sm:w-80">
+        {(
+          [
+            [false, 'Eventos'],
+            [true, `Archivados${cantidadArchivados ? ` (${cantidadArchivados})` : ''}`],
+          ] as const
+        ).map(([v, t]) => (
+          <button
+            key={String(v)}
+            onClick={() => setVerArchivados(v)}
+            className={verArchivados === v ? 'plata rounded-md py-1.5 font-semibold' : 'rounded-md py-1.5 text-suave hover:bg-realce'}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+      {verArchivados && (
+        <p className="text-xs text-suave">Los eventos archivados no se borran: siguen contando para el stock del depósito y se pueden desarchivar.</p>
+      )}
+
       {isPending ? (
         <Cargando />
       ) : error ? (
         <Aviso>{mensajeError(error)}</Aviso>
       ) : lista.length === 0 ? (
         <Tarjeta className="px-4 py-10 text-center text-suave">
-          {(eventos?.length ?? 0) === 0
+          {verArchivados
+            ? busqueda
+              ? 'No hay eventos archivados que coincidan.'
+              : 'No hay eventos archivados.'
+            : (eventos?.length ?? 0) === 0
             ? puede('eventos.gestionar')
               ? 'Todavía no hay eventos. Creá el primero con "+ Evento".'
               : 'Todavía no tenés eventos asignados.'

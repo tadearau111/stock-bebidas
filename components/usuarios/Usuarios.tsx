@@ -268,7 +268,7 @@ function EventosAsignados({ usuarioId }: { usuarioId: string }) {
   const [error, setError] = useState('')
 
   const lista = useMemo(() => {
-    const todos = eventos ?? []
+    const todos = (eventos ?? []).filter((e) => !e.archivado || asignados?.has(e.id))
     // próximos primero (del más cercano al más lejano), después los pasados
     const proximos = todos.filter((e) => e.fecha >= hoyISO()).sort((a, b) => a.fecha.localeCompare(b.fecha))
     const pasados = todos.filter((e) => eventoPasado(e.fecha))

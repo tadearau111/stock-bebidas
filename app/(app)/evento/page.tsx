@@ -10,7 +10,7 @@ import { PestanaCaja } from '@/components/eventos/PestanaCaja'
 import { PestanaCostos } from '@/components/eventos/PestanaCostos'
 import { PestanaResumen } from '@/components/eventos/PestanaResumen'
 import { Aviso, Boton, Cargando, Ventana, cx } from '@/components/ui'
-import { ejecutar, useBorrarEvento, useCambioEvento, useEvento } from '@/lib/eventos'
+import { ejecutar, useArchivarEvento, useBorrarEvento, useCambioEvento, useEvento } from '@/lib/eventos'
 import { formatoFechaEvento, formatoNumero, mensajeError } from '@/lib/formato'
 import { useLocalId, useSesion } from '@/lib/sesion'
 
@@ -33,6 +33,7 @@ function Evento() {
   const { data: detalle, isPending, error } = useEvento(id)
   const cambio = useCambioEvento(id)
   const borrar = useBorrarEvento()
+  const archivar = useArchivarEvento()
   const [editando, setEditando] = useState(false)
   const [errorAccion, setErrorAccion] = useState('')
 
@@ -72,8 +73,22 @@ function Evento() {
     }
   }
 
+  async function alternarArchivo() {
+    setErrorAccion('')
+    try {
+      await archivar.mutateAsync({ id, archivado: !evento.archivado })
+      if (!evento.archivado) router.replace('/eventos')
+    } catch (e) {
+      setErrorAccion(mensajeError(e))
+    }
+  }
+
   async function borrarEvento() {
-    if (!confirm(`¿Borrar el evento "${evento.nombre}"? Se borra todo lo cargado y el stock vuelve al depósito. No se puede deshacer.`)) return
+    const aviso =
+      `¿BORRAR el evento "${evento.nombre}" para siempre?\n\n` +
+      'Se borra todo lo cargado y lo consumido VUELVE AL DEPÓSITO: el stock va a subir como si esa bebida no se hubiera usado.\n\n' +
+      'Usalo solo para eventos de prueba o cargados por error. Si solo querés sacarlo de la lista, tocá "Archivar".\n\nNo se puede deshacer.'
+    if (!confirm(aviso)) return
     try {
       await borrar.mutateAsync(id)
       router.replace('/eventos')
@@ -105,9 +120,12 @@ function Evento() {
             {evento.notas && <p className="mt-1 text-sm text-suave">{evento.notas}</p>}
           </div>
           {puede('eventos.gestionar') && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Boton variante="secundario" onClick={() => setEditando(true)}>
                 Editar
+              </Boton>
+              <Boton variante="secundario" onClick={alternarArchivo} cargando={archivar.isPending} textoCargando="…">
+                {evento.archivado ? 'Desarchivar' : 'Archivar'}
               </Boton>
               <Boton variante="peligro" onClick={borrarEvento} cargando={borrar.isPending} textoCargando="Borrando…">
                 Borrar
@@ -117,6 +135,12 @@ function Evento() {
         </div>
       </div>
 
+      {evento.archivado && (
+        <Aviso tipo="info">
+          Este evento está <b>archivado</b>: no aparece en la lista de eventos, pero sigue guardado y contando para el stock del depósito. Lo podés seguir
+          consultando y corrigiendo.
+        </Aviso>
+      )}
       {errorAccion && <Aviso>{errorAccion}</Aviso>}
 
       {/* Pestañas */}

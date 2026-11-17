@@ -1308,3 +1308,15 @@ create trigger auditar after insert or update or delete on public.notas_info
 
 revoke all on all tables in schema public from anon;
 revoke execute on all functions in schema public from anon;
+
+-- ===== supabase/migrations/20261122000001_eventos_archivados.sql =====
+-- =====================================================================
+-- Archivar eventos: salen de la lista principal pero NO se borran,
+-- así el stock del depósito (que se calcula con lo consumido en todos
+-- los eventos) no cambia. Se pueden desarchivar.
+-- =====================================================================
+
+alter table public.eventos add column archivado boolean not null default false;
+alter table public.eventos add column archivado_en timestamptz;
+
+create index eventos_activos on public.eventos (local_id, archivado, fecha desc);

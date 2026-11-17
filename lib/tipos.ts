@@ -80,6 +80,8 @@ export interface Evento {
   personas: number
   notas: string | null
   creado_en: string
+  archivado: boolean
+  archivado_en: string | null
 }
 
 export interface Barra {

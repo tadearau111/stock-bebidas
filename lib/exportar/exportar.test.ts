@@ -67,7 +67,7 @@ describe('Lista de faltantes', () => {
 })
 
 const detalle: DetalleEvento = {
-  evento: { id: 'e', local_id: 'l', fecha: '2026-11-20', nombre: 'Casamiento García', personas: 100, notas: null, creado_en: '' },
+  evento: { id: 'e', local_id: 'l', fecha: '2026-11-20', nombre: 'Casamiento García', personas: 100, notas: null, creado_en: '', archivado: false, archivado_en: null },
   barras: [
     { id: 'b1', evento_id: 'e', nombre: 'Barra 1', orden: 1 },
     { id: 'b2', evento_id: 'e', nombre: 'Barra VIP', orden: 2 },

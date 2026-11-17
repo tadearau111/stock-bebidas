@@ -179,7 +179,7 @@ function FormNota({ nota, alTerminar }: { nota?: NotaInfo; alTerminar: () => voi
   const [notas, setNotas] = useState(nota?.notas ?? '')
   const [error, setError] = useState('')
 
-  const proximos = (eventos ?? []).filter((e) => e.fecha >= hoyISO() || e.id === eventoId).sort((a, b) => a.fecha.localeCompare(b.fecha))
+  const proximos = (eventos ?? []).filter((e) => (e.fecha >= hoyISO() && !e.archivado) || e.id === eventoId).sort((a, b) => a.fecha.localeCompare(b.fecha))
 
   function elegirEvento(id: string) {
     setEventoId(id)

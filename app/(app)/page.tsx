@@ -186,7 +186,7 @@ function UltimosMovimientos() {
 
 function UltimosEventos() {
   const { data, isPending } = useEventos()
-  const lista = (data ?? []).slice(0, 5)
+  const lista = (data ?? []).filter((e) => !e.archivado).slice(0, 5)
   return (
     <section>
       <div className="mb-2 flex items-baseline justify-between">

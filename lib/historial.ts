@@ -91,6 +91,8 @@ const CAMPOS: Record<string, string> = {
   cambio_proxima_caja: 'Cambio próxima caja',
   vasos_no_devueltos: 'Vasos no devueltos',
   monto: 'Monto',
+  archivado: 'Archivado',
+  archivado_en: 'Archivado el',
   titulo: 'Título',
   hora_apertura: 'Apertura',
   hora_cierre: 'Cierre',
@@ -130,7 +132,7 @@ export function formatoValor(campo: string, valor: unknown, nombres?: Nombres): 
     if (campo === 'trago_id') return nombres.tragos?.get(texto) ?? 'trago'
     if (campo === 'proveedor_id') return nombres.proveedores?.get(texto) ?? 'proveedor'
   }
-  if (campo === 'hora' || (campo === 'fecha' && texto.includes('T'))) return fmtFechaHora.format(new Date(texto))
+  if (campo === 'hora' || campo === 'archivado_en' || (campo === 'fecha' && texto.includes('T'))) return fmtFechaHora.format(new Date(texto))
   if (campo === 'fecha' && /^\d{4}-\d{2}-\d{2}$/.test(texto)) return texto.split('-').reverse().join('/')
   if (CAMPOS_PESOS.has(campo) && !Number.isNaN(Number(texto))) {
     return '$ ' + Number(texto).toLocaleString('es-AR', { maximumFractionDigits: 2 })
@@ -161,6 +163,9 @@ export function describir(r: RegistroAuditoria, nombres?: Nombres): Descripcion 
     titulo = r.cambios.activo.despues ? 'reactivó un usuario' : 'desactivó un usuario'
   }
   if (r.tabla === 'perfiles' && r.accion === 'alta') titulo = 'se creó un usuario'
+  if (r.tabla === 'eventos' && r.cambios.archivado && r.accion === 'modificacion') {
+    titulo = r.cambios.archivado.despues ? 'archivó un evento' : 'desarchivó un evento'
+  }
   if (r.tabla === 'articulos' && r.cambios.activo && r.accion === 'modificacion' && Object.keys(r.cambios).length === 1) {
     titulo = r.cambios.activo.despues ? 'reactivó un artículo' : 'desactivó un artículo'
   }

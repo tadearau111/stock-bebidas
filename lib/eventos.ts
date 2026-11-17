@@ -176,3 +176,23 @@ export function useBorrarEvento() {
     },
   })
 }
+
+/** Archivar / desarchivar: el evento no se borra, así el stock del depósito no cambia. */
+export function useArchivarEvento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, archivado }: { id: string; archivado: boolean }) =>
+      ejecutar(
+        supabase()
+          .from('eventos')
+          .update({ archivado, archivado_en: archivado ? new Date().toISOString() : null })
+          .eq('id', id)
+          .select('id')
+          .single(),
+      ),
+    onSuccess: (_d, { id }) => {
+      qc.invalidateQueries({ queryKey: ['eventos'] })
+      qc.invalidateQueries({ queryKey: ['evento', id] })
+    },
+  })
+}
