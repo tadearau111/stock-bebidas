@@ -84,6 +84,8 @@ const detalle: DetalleEvento = {
     { id: 'a1', articulo_id: 'fernet', cuartos: 2, hora: '', articulo: { nombre: 'Fernet' } },
     { id: 'a2', articulo_id: 'fernet', cuartos: 2, hora: '', articulo: { nombre: 'Fernet' } },
   ],
+  caja: null,
+  gastos: [],
 }
 
 describe('Resumen de evento', () => {
@@ -160,5 +162,33 @@ describe('WhatsApp y formatos', () => {
     expect(textoCelda(1500.5, 'pesos')).toBe('$ 1.500,50')
     expect(textoCelda(null)).toBe('—')
     expect(textoCelda(0.25, 'numero')).toBe('0,25')
+  })
+})
+
+describe('Caja en el resumen del evento', () => {
+  const conCaja: DetalleEvento = {
+    ...detalle,
+    caja: {
+      evento_id: 'e', notas: null, actualizado_en: '', actualizado_por: null,
+      efectivo_real: 100000, efectivo_sistema: 102000, cierre_lotes: 250000, tarjetas_sistema: 250000,
+      boleteria_efectivo: 40000, boleteria_lotes: 60000, guardarropas_efectivo: 8000, guardarropas_lotes: 2000,
+      cambio_proxima_caja: 20000, vasos_no_devueltos: 4,
+    },
+    gastos: [{ id: 'g', evento_id: 'e', monto: 5000, detalle: 'Hielo de emergencia', hora: '2026-11-21T03:00:00Z' }],
+  }
+  it('agrega la caja y los gastos, también para encargados', () => {
+    const r = reporteEvento(conCaja, articulos, { incluirCostos: false })
+    const caja = r.secciones.find((s) => s.titulo === 'Caja')!
+    expect(caja.filas.find((f) => f[0] === 'Barras · Diferencia efectivo')?.[1]).toBe(-2000)
+    expect(caja.filas.find((f) => f[0] === 'RETIRO A CAJA FUERTE')?.[1]).toBe(148000 - 5000 - 20000)
+    expect(caja.total).toEqual(['VENTA TOTAL + BOLETERÍA + GUARDARROPAS', 460000])
+    expect(caja.resaltar).toEqual([2]) // falta efectivo
+    expect(caja.nota).toContain('Vasos no devueltos: 4')
+    expect(r.secciones.find((s) => s.titulo === 'Gastos de la noche')!.total).toEqual(['Total gastos', 5000, null])
+    expect(r.textoWhatsApp).toContain('*Retiro a caja fuerte:* $ 123.000,00')
+  })
+  it('si no se cargó nada de caja, no aparece', () => {
+    const r = reporteEvento(detalle, articulos, { incluirCostos: true })
+    expect(r.secciones.some((s) => s.titulo === 'Caja')).toBe(false)
   })
 })

@@ -35,7 +35,7 @@ export function useEvento(id: string) {
     enabled: !!id,
     queryFn: async (): Promise<DetalleEvento | null> => {
       const sb = supabase()
-      const [ev, barras, lineas, retiros, abierta] = await Promise.all([
+      const [ev, barras, lineas, retiros, abierta, caja, gastos] = await Promise.all([
         sb.from('eventos').select('*').eq('id', id).maybeSingle(),
         sb.from('barras').select('*').eq('evento_id', id).order('orden').order('creado_en'),
         sb
@@ -54,6 +54,8 @@ export function useEvento(id: string) {
           .select('*, articulo:articulos(nombre), autor:perfiles(nombre)')
           .eq('evento_id', id)
           .order('hora', { ascending: false }),
+        sb.from('evento_caja').select('*').eq('evento_id', id).maybeSingle(),
+        sb.from('evento_gastos').select('*, autor:perfiles(nombre)').eq('evento_id', id).order('hora'),
       ])
       const evento = lanzar(ev)
       if (!evento) return null
@@ -66,6 +68,8 @@ export function useEvento(id: string) {
         lineas: ls,
         retiros: lanzar(retiros) as DetalleEvento['retiros'],
         bebidaAbierta: lanzar(abierta) as DetalleEvento['bebidaAbierta'],
+        caja: lanzar(caja) as DetalleEvento['caja'],
+        gastos: lanzar(gastos) as DetalleEvento['gastos'],
       }
     },
   })

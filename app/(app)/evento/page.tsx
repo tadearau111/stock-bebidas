@@ -6,6 +6,7 @@ import { Fragment, Suspense, useState } from 'react'
 import { FormEvento } from '@/components/eventos/FormEvento'
 import { PestanaBarra } from '@/components/eventos/PestanaBarra'
 import { PestanaBebidaAbierta } from '@/components/eventos/PestanaBebidaAbierta'
+import { PestanaCaja } from '@/components/eventos/PestanaCaja'
 import { PestanaCostos } from '@/components/eventos/PestanaCostos'
 import { PestanaResumen } from '@/components/eventos/PestanaResumen'
 import { Aviso, Boton, Cargando, Ventana, cx } from '@/components/ui'
@@ -54,7 +55,7 @@ function Evento() {
   const barraActiva = barras.find((b) => b.id === pestana)
   // La pestaña Costos la ve quien gestiona eventos (los encargados de la noche no ven precios ahí)
   const verCostos = puede('eventos.gestionar')
-  const fijas = ['abierta', 'resumen', ...(verCostos ? ['costos'] : [])]
+  const fijas = ['abierta', 'resumen', ...(verCostos ? ['costos'] : []), 'caja']
   const actual = barraActiva ? barraActiva.id : fijas.includes(pestana) ? pestana : (barras[0]?.id ?? 'resumen')
   const barraMostrada = barras.find((b) => b.id === actual)
 
@@ -86,6 +87,7 @@ function Evento() {
     { id: 'abierta', nombre: 'Bebida abierta' },
     { id: 'resumen', nombre: 'Resumen' },
     ...(verCostos ? [{ id: 'costos', nombre: 'Costos' }] : []),
+    { id: 'caja', nombre: 'Caja' },
   ]
 
   return (
@@ -150,7 +152,13 @@ function Evento() {
       ) : actual === 'abierta' ? (
         <PestanaBebidaAbierta detalle={detalle} />
       ) : (
-        actual === 'costos' ? <PestanaCostos detalle={detalle} /> : <PestanaResumen detalle={detalle} />
+        actual === 'costos' ? (
+          <PestanaCostos detalle={detalle} />
+        ) : actual === 'caja' ? (
+          <PestanaCaja key={detalle.caja?.actualizado_en ?? 'nueva'} detalle={detalle} />
+        ) : (
+          <PestanaResumen detalle={detalle} />
+        )
       )}
 
       <Ventana abierta={editando} alCerrar={() => setEditando(false)} titulo="Editar evento">

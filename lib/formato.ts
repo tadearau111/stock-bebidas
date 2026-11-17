@@ -37,7 +37,12 @@ export function ahoraParaInput(): string {
 export function leerPrecio(texto: string): number | null {
   const limpio = texto.trim().replace(/\$/g, '').replace(/\s/g, '')
   if (!limpio) return null
-  const normal = limpio.includes(',') ? limpio.replace(/\./g, '').replace(',', '.') : limpio
+  // Formato argentino: el punto separa miles ("100.000" = cien mil) y la coma, decimales
+  const normal = limpio.includes(',')
+    ? limpio.replace(/\./g, '').replace(',', '.')
+    : /^-?\d{1,3}(\.\d{3})+$/.test(limpio)
+      ? limpio.replace(/\./g, '')
+      : limpio
   const n = Number(normal)
   return Number.isFinite(n) ? n : NaN
 }

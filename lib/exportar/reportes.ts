@@ -14,6 +14,7 @@ import {
   tragosRetirados,
   type ArticuloPrecio,
 } from '../calculos/evento'
+import { CAJA_VACIA, cajaCargada, calcularCaja } from '../calculos/caja'
 import type { Articulo, DetalleEvento } from '../tipos'
 
 export type Celda = string | number | null
@@ -347,6 +348,52 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
     })
   }
 
+  // Caja (si se cargó algo)
+  const hayCaja = cajaCargada(detalle.caja, detalle.gastos)
+  const caja = calcularCaja(detalle.caja ?? CAJA_VACIA, detalle.gastos)
+  if (hayCaja) {
+    const c = detalle.caja ?? CAJA_VACIA
+    secciones.push({
+      titulo: 'Caja',
+      columnas: [{ titulo: 'Concepto' }, { titulo: 'Monto', tipo: 'pesos' }],
+      filas: [
+        ['Barras · Efectivo real', c.efectivo_real],
+        ['Barras · Efectivo sistema', c.efectivo_sistema],
+        ['Barras · Diferencia efectivo', caja.diferenciaEfectivo],
+        ['Barras · Cierre de lotes', c.cierre_lotes],
+        ['Barras · Tarjetas sistema', c.tarjetas_sistema],
+        ['Barras · Diferencia tarjetas', caja.diferenciaTarjetas],
+        ['VENTA TOTAL CAJA (barras)', caja.ventaCaja],
+        ['Boletería · Efectivo real', c.boleteria_efectivo],
+        ['Boletería · Cierre de lotes', c.boleteria_lotes],
+        ['TOTAL BOLETERÍA', caja.totalBoleteria],
+        ['Guardarropas · Efectivo real', c.guardarropas_efectivo],
+        ['Guardarropas · Cierre de lotes', c.guardarropas_lotes],
+        ['TOTAL GUARDARROPAS', caja.totalGuardarropas],
+        ['GASTOS TOTALES', caja.totalGastos],
+        ['Cambio disponible próxima caja', c.cambio_proxima_caja],
+        ['RETIRO A CAJA FUERTE', caja.retiroCajaFuerte],
+      ],
+      resaltar: [
+        ...(caja.diferenciaEfectivo < 0 ? [2] : []),
+        ...(caja.diferenciaTarjetas < 0 ? [5] : []),
+        ...(caja.retiroCajaFuerte < 0 ? [15] : []),
+      ],
+      total: ['VENTA TOTAL + BOLETERÍA + GUARDARROPAS', caja.ventaTotalGeneral],
+      nota:
+        `Vasos no devueltos: ${c.vasos_no_devueltos ?? 0}. ` +
+        'Diferencia = real - sistema (negativo: falta plata). Retiro a caja fuerte = todo el efectivo (barras + boletería + guardarropas) - gastos - cambio para la próxima caja.',
+    })
+    if (detalle.gastos.length) {
+      secciones.push({
+        titulo: 'Gastos de la noche',
+        columnas: [{ titulo: 'Detalle' }, { titulo: 'Monto', tipo: 'pesos' }, { titulo: 'Hora' }],
+        filas: detalle.gastos.map((g) => [g.detalle, g.monto, fechaHora.format(new Date(g.hora)).replace(/\u00a0|\u202f/g, ' ')]),
+        total: ['Total gastos', caja.totalGastos, null],
+      })
+    }
+  }
+
   const datos: [string, string][] = [
     ['Fecha', fechaEvento(evento.fecha)],
     ['Personas', numero.format(evento.personas)],
@@ -356,6 +403,9 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
   ]
   if (opciones.incluirCostos) {
     datos.push(['Total precio costo', textoCelda(costos.totalCosto, 'pesos')], ['Total precio venta', textoCelda(costos.totalVenta, 'pesos')])
+  }
+  if (hayCaja) {
+    datos.push(['Venta total + boletería + guardarropas', textoCelda(caja.ventaTotalGeneral, 'pesos')], ['Retiro a caja fuerte', textoCelda(caja.retiroCajaFuerte, 'pesos')])
   }
 
   const lineasWa = [
@@ -384,6 +434,19 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
   if (abierta.size) lineasWa.push(`Bebida abierta: ${[...abierta.entries()].map(([id, n]) => `${nombreAbierta(id)} ${formatoBotellas(n)}`).join(', ')}`)
   if (opciones.incluirCostos) {
     lineasWa.push('', `*Total costo:* ${textoCelda(costos.totalCosto, 'pesos')}`, `*Total venta:* ${textoCelda(costos.totalVenta, 'pesos')}`)
+  }
+
+  if (hayCaja) {
+    lineasWa.push(
+      '',
+      '*Caja*',
+      `Venta caja barras: ${textoCelda(caja.ventaCaja, 'pesos')}`,
+      `Diferencia efectivo: ${textoCelda(caja.diferenciaEfectivo, 'pesos')} · Diferencia tarjetas: ${textoCelda(caja.diferenciaTarjetas, 'pesos')}`,
+      `Boletería: ${textoCelda(caja.totalBoleteria, 'pesos')} · Guardarropas: ${textoCelda(caja.totalGuardarropas, 'pesos')}`,
+      `Gastos: ${textoCelda(caja.totalGastos, 'pesos')}`,
+      `*Venta total + boletería + guardarropas:* ${textoCelda(caja.ventaTotalGeneral, 'pesos')}`,
+      `*Retiro a caja fuerte:* ${textoCelda(caja.retiroCajaFuerte, 'pesos')}`,
+    )
   }
 
   return {

@@ -23,6 +23,8 @@ export interface Nombres {
 const SUJETOS: Record<string, string> = {
   articulos: 'artículo',
   tragos: 'trago o vaso',
+  evento_caja: 'caja del evento',
+  evento_gastos: 'gasto de la noche',
   movimientos: 'movimiento del depósito',
   eventos: 'evento',
   barras: 'barra',
@@ -40,6 +42,7 @@ const SUJETOS: Record<string, string> = {
 export const AREAS: Record<string, string[]> = {
   'Depósito y artículos': ['articulos', 'movimientos', 'tragos'],
   Eventos: ['eventos', 'barras', 'barra_articulos', 'reposiciones', 'retiros', 'bebida_abierta', 'evento_asignaciones'],
+  Caja: ['evento_caja', 'evento_gastos'],
   'Usuarios y permisos': ['perfiles', 'miembros', 'roles', 'rol_permisos'],
 }
 
@@ -72,10 +75,22 @@ const CAMPOS: Record<string, string> = {
   trago_id: 'Trago',
   evento_id: 'Evento',
   permiso_codigo: 'Permiso',
+  efectivo_real: 'Efectivo real',
+  efectivo_sistema: 'Efectivo sistema',
+  cierre_lotes: 'Cierre de lotes',
+  tarjetas_sistema: 'Tarjetas sistema',
+  boleteria_efectivo: 'Boletería efectivo',
+  boleteria_lotes: 'Boletería cierre de lotes',
+  guardarropas_efectivo: 'Guardarropas efectivo',
+  guardarropas_lotes: 'Guardarropas cierre de lotes',
+  cambio_proxima_caja: 'Cambio próxima caja',
+  vasos_no_devueltos: 'Vasos no devueltos',
+  monto: 'Monto',
+  detalle: 'Detalle',
 }
 
 // Columnas técnicas que no aportan nada a quien lee
-const OCULTAS = new Set(['id', 'local_id', 'creado_por', 'barra_id', 'barra_articulo_id', 'es_sistema'])
+const OCULTAS = new Set(['id', 'local_id', 'creado_por', 'barra_id', 'barra_articulo_id', 'es_sistema', 'actualizado_por'])
 
 const VALORES: Record<string, Record<string, string>> = {
   tipo: { ingreso: 'Ingreso', ajuste: 'Ajuste', personal: 'Personal', cortesia: 'Cortesía', detalle: 'Detallada', total: 'Total directo' },
@@ -84,6 +99,11 @@ const VALORES: Record<string, Record<string, string>> = {
 }
 
 const fmtFechaHora = new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+const CAMPOS_PESOS = new Set([
+  'precio_costo', 'precio_venta', 'efectivo_real', 'efectivo_sistema', 'cierre_lotes', 'tarjetas_sistema',
+  'boleteria_efectivo', 'boleteria_lotes', 'guardarropas_efectivo', 'guardarropas_lotes', 'cambio_proxima_caja', 'monto',
+])
 
 export function formatoValor(campo: string, valor: unknown, nombres?: Nombres): string {
   if (valor == null || valor === '') return '—'
@@ -99,7 +119,7 @@ export function formatoValor(campo: string, valor: unknown, nombres?: Nombres): 
   }
   if (campo === 'hora' || (campo === 'fecha' && texto.includes('T'))) return fmtFechaHora.format(new Date(texto))
   if (campo === 'fecha' && /^\d{4}-\d{2}-\d{2}$/.test(texto)) return texto.split('-').reverse().join('/')
-  if ((campo === 'precio_costo' || campo === 'precio_venta') && !Number.isNaN(Number(texto))) {
+  if (CAMPOS_PESOS.has(campo) && !Number.isNaN(Number(texto))) {
     return '$ ' + Number(texto).toLocaleString('es-AR', { maximumFractionDigits: 2 })
   }
   return texto

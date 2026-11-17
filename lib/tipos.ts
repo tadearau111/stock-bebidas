@@ -1,3 +1,4 @@
+import type { DatosCaja } from './calculos/caja'
 import type { TipoMovimiento } from './calculos/stock'
 
 export type Unidad = 'unidad' | 'bolsa'
@@ -127,10 +128,28 @@ export interface BebidaAbiertaDB {
   autor?: { nombre: string } | null
 }
 
+export interface CajaDB extends DatosCaja {
+  evento_id: string
+  notas: string | null
+  actualizado_en: string
+  actualizado_por: string | null
+}
+
+export interface GastoDB {
+  id: string
+  evento_id: string
+  monto: number
+  detalle: string
+  hora: string
+  autor?: { nombre: string } | null
+}
+
 export interface DetalleEvento {
   evento: Evento
   barras: Barra[]
   lineas: LineaBarraDB[]
   retiros: RetiroDB[]
   bebidaAbierta: BebidaAbiertaDB[]
+  caja: CajaDB | null
+  gastos: GastoDB[]
 }
