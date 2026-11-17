@@ -4,7 +4,7 @@ import type { Articulo, DetalleEvento } from '../tipos'
 import { nombreHoja, reporteAExcel } from './excel'
 import { reporteAPdf } from './pdf'
 import { linkWhatsApp } from './compartir'
-import { reporteDeposito, reporteEvento, reporteFaltantes, slug, textoCelda } from './reportes'
+import { reporteCajaFuerteMes, reporteDeposito, reporteEvento, reporteFaltantes, slug, textoCelda } from './reportes'
 
 const art = (nombre: string, stock: number, minimo: number, costo: number | null = null, venta: number | null = null, extra: Partial<Articulo> = {}): Articulo => ({
   id: slug(nombre),
@@ -190,5 +190,34 @@ describe('Caja en el resumen del evento', () => {
   it('si no se cargó nada de caja, no aparece', () => {
     const r = reporteEvento(detalle, articulos, { incluirCostos: true })
     expect(r.secciones.some((s) => s.titulo === 'Caja')).toBe(false)
+  })
+})
+
+describe('Resumen mensual de caja fuerte', () => {
+  it('arma el resumen y los movimientos del mes', () => {
+    const r = reporteCajaFuerteMes(
+      {
+        anio: 2026, mes: 11, saldo_inicial: 0, efectivo: 148000, gastos: 8500, retiros: 0, ingresos: 50000, saldo_final: 189500,
+        renglones: [
+          { clase: 'ingreso', fecha: '2026-11-01T10:00:00', titulo: 'Ingreso', detalle: 'Saldo inicial', monto: 50000, saldo: 50000, evento_id: null },
+          { clase: 'efectivo', fecha: '2026-11-14', titulo: 'Efectivo real', detalle: 'Casamiento', monto: 148000, saldo: 198000, evento_id: 'e' },
+          { clase: 'gastos', fecha: '2026-11-14', titulo: 'Gastos', detalle: 'Casamiento', monto: -8500, saldo: 189500, evento_id: 'e', items: [{ detalle: 'Hielo de emergencia', monto: 5000 }, { detalle: 'Propina DJ', monto: 3500 }] },
+        ],
+      },
+      'Salón',
+      'Cerrado',
+    )
+    expect(r.titulo).toBe('Caja fuerte · Noviembre 2026')
+    expect(r.secciones[0].total).toEqual(['= Saldo al cierre del mes', 189500])
+    expect(r.secciones[1].filas[1]).toEqual(['14/11/2026', 'Efectivo real', 'Casamiento', 148000, 198000])
+    expect(r.secciones[1].resaltar).toEqual([2])
+    expect(r.textoWhatsApp).toContain('*Saldo al cierre: $ 189.500,00*')
+    expect(r.nombreArchivo).toBe('caja-fuerte-2026-11')
+    const det = r.secciones.find((s) => s.titulo === 'Detalle de gastos')!
+    expect(det.filas).toEqual([
+      ['14/11/2026', 'Casamiento', 'Hielo de emergencia', 5000],
+      ['14/11/2026', 'Casamiento', 'Propina DJ', 3500],
+    ])
+    expect(r.textoWhatsApp).toContain('• Casamiento: Hielo de emergencia $ 5.000,00')
   })
 })

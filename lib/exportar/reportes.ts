@@ -15,6 +15,7 @@ import {
   type ArticuloPrecio,
 } from '../calculos/evento'
 import { CAJA_VACIA, cajaCargada, calcularCaja } from '../calculos/caja'
+import { nombreMes, type RenglonResumen } from '../calculos/cajaFuerte'
 import type { Articulo, DetalleEvento } from '../tipos'
 
 export type Celda = string | number | null
@@ -456,5 +457,66 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
     secciones,
     textoWhatsApp: lineasWa.join('\n'),
     nombreArchivo: `evento-${slug(evento.nombre)}-${evento.fecha}`,
+  }
+}
+
+// ------------------------------------------------------------------ Caja fuerte: resumen mensual
+
+export function reporteCajaFuerteMes(
+  m: { anio: number; mes: number; saldo_inicial: number; efectivo: number; gastos: number; retiros: number; ingresos: number; saldo_final: number; renglones: RenglonResumen[] },
+  local: string,
+  estado: string,
+): Reporte {
+  const nombre = `${nombreMes(m.mes)} ${m.anio}`
+  const fecha = (f: string) => (f.length === 10 ? f.split('-').reverse().join('/') : f.slice(0, 10).split('-').reverse().join('/') + ' ' + f.slice(11, 16))
+  return {
+    titulo: `Caja fuerte · ${nombre}`,
+    subtitulo: `${local} · ${estado}`,
+    datos: [
+      ['Saldo al empezar el mes', textoCelda(m.saldo_inicial, 'pesos')],
+      ['Saldo al cierre del mes', textoCelda(m.saldo_final, 'pesos')],
+    ],
+    secciones: [
+      {
+        titulo: 'Resumen del mes',
+        columnas: [{ titulo: 'Concepto' }, { titulo: 'Monto', tipo: 'pesos' }],
+        filas: [
+          ['Saldo al empezar el mes', m.saldo_inicial],
+          ['+ Efectivo real de eventos', m.efectivo],
+          ['- Gastos de eventos', m.gastos],
+          ['- Retiros', m.retiros],
+          ['+ Ingresos manuales', m.ingresos],
+        ],
+        total: ['= Saldo al cierre del mes', m.saldo_final],
+      },
+      {
+        titulo: 'Movimientos',
+        columnas: [{ titulo: 'Fecha' }, { titulo: 'Concepto' }, { titulo: 'Detalle' }, { titulo: 'Monto', tipo: 'pesos' }, { titulo: 'Saldo', tipo: 'pesos' }],
+        filas: m.renglones.map((r) => [fecha(r.fecha), r.titulo, r.detalle, r.monto, r.saldo]),
+        resaltar: m.renglones.map((r, i) => (r.monto < 0 ? i : -1)).filter((i) => i >= 0),
+        nota: m.renglones.length === 0 ? 'Sin movimientos en el mes.' : 'En rojo: lo que salió de la caja fuerte (gastos y retiros).',
+      },
+      ...(m.renglones.some((r) => r.items?.length)
+        ? [
+            {
+              titulo: 'Detalle de gastos',
+              columnas: [{ titulo: 'Fecha' }, { titulo: 'Evento' }, { titulo: 'Para qué fue' }, { titulo: 'Monto', tipo: 'pesos' as const }],
+              filas: m.renglones.flatMap((r) => (r.items ?? []).map((g) => [fecha(r.fecha), r.detalle, g.detalle, g.monto] as Celda[])),
+              total: ['Total gastos', null, null, m.gastos] as Celda[],
+            },
+          ]
+        : []),
+    ],
+    textoWhatsApp: [
+      `*Caja fuerte · ${nombre}*`,
+      `Saldo al empezar: ${textoCelda(m.saldo_inicial, 'pesos')}`,
+      `+ Efectivo de eventos: ${textoCelda(m.efectivo, 'pesos')}`,
+      `− Gastos de eventos: ${textoCelda(m.gastos, 'pesos')}`,
+      ...m.renglones.flatMap((r) => (r.items ?? []).map((g) => `   • ${r.detalle}: ${g.detalle} ${textoCelda(g.monto, 'pesos')}`)),
+      `− Retiros: ${textoCelda(m.retiros, 'pesos')}`,
+      `+ Ingresos: ${textoCelda(m.ingresos, 'pesos')}`,
+      `*Saldo al cierre: ${textoCelda(m.saldo_final, 'pesos')}*`,
+    ].join('\n'),
+    nombreArchivo: `caja-fuerte-${m.anio}-${String(m.mes).padStart(2, '0')}`,
   }
 }

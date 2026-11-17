@@ -7,6 +7,8 @@ export interface AporteEvento {
   nombre: string
   efectivo: number
   gastos: number
+  /** Detalle de cada gasto del evento (para qué fue y cuánto) */
+  gastos_detalle?: { detalle: string; monto: number }[]
 }
 
 export interface MovimientoManual {
@@ -75,3 +77,102 @@ export function armarLibro(eventos: AporteEvento[], manuales: MovimientoManual[]
     totalIngresos: suma('ingreso'),
   }
 }
+
+// ------------------------------------------------------------------ Resumen mensual
+
+/** Renglón en formato simple: el mismo para lo calculado en vivo y para lo guardado en un cierre. */
+export interface RenglonResumen {
+  clase: Renglon['clase']
+  fecha: string
+  titulo: string
+  detalle: string
+  monto: number
+  saldo: number
+  evento_id: string | null
+  /** En los renglones de gastos: el detalle de cada gasto */
+  items?: { detalle: string; monto: number }[]
+}
+
+export interface ResumenMes {
+  anio: number
+  mes: number // 1..12
+  clave: string // "2026-11"
+  saldo_inicial: number
+  efectivo: number
+  gastos: number
+  retiros: number
+  ingresos: number
+  saldo_final: number
+  renglones: RenglonResumen[]
+}
+
+export function aRenglonResumen(r: Renglon): RenglonResumen {
+  if (r.clase === 'efectivo' || r.clase === 'gastos') {
+    return {
+      clase: r.clase,
+      fecha: r.fecha,
+      titulo: r.clase === 'efectivo' ? 'Efectivo real' : 'Gastos',
+      detalle: r.evento.nombre,
+      monto: r.monto,
+      saldo: r.saldo,
+      evento_id: r.evento.evento_id,
+      ...(r.clase === 'gastos' ? { items: (r.evento.gastos_detalle ?? []).map((g) => ({ detalle: g.detalle, monto: Number(g.monto) })) } : {}),
+    }
+  }
+  return {
+    clase: r.clase,
+    fecha: r.fecha,
+    titulo: r.clase === 'retiro' ? 'Retiro' : 'Ingreso',
+    detalle: r.mov.detalle + (r.mov.autor ? ` (cargó ${r.mov.autor})` : ''),
+    monto: r.monto,
+    saldo: r.saldo,
+    evento_id: null,
+  }
+}
+
+const claveMes = (fecha: string) => fecha.slice(0, 7)
+
+/** "2026-11" del momento actual (hora local). */
+export function mesActual(hoy = new Date()): string {
+  return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
+}
+
+/**
+ * Agrupa el libro por mes (de más viejo a más nuevo). Incluye siempre el mes
+ * actual aunque no tenga movimientos. El saldo inicial de cada mes es el
+ * saldo con que cerró el anterior.
+ */
+export function resumirPorMes(libro: LibroCajaFuerte, hoy = new Date()): ResumenMes[] {
+  const claves = new Set(libro.renglones.map((r) => claveMes(r.fecha)))
+  claves.add(mesActual(hoy))
+  const ordenadas = [...claves].sort()
+  let saldo = 0
+  return ordenadas.map((clave) => {
+    const rs = libro.renglones.filter((r) => claveMes(r.fecha) === clave)
+    const suma = (c: Renglon['clase']) => centavos(Math.abs(rs.filter((r) => r.clase === c).reduce((t, r) => t + r.monto, 0)))
+    const inicial = saldo
+    saldo = rs.length ? rs[rs.length - 1].saldo : saldo
+    const [anio, mes] = clave.split('-').map(Number)
+    return {
+      anio,
+      mes,
+      clave,
+      saldo_inicial: inicial,
+      efectivo: suma('efectivo'),
+      gastos: suma('gastos'),
+      retiros: suma('retiro'),
+      ingresos: suma('ingreso'),
+      saldo_final: saldo,
+      renglones: rs.map(aRenglonResumen),
+    }
+  })
+}
+
+/** ¿Lo guardado en el cierre es distinto a lo que da hoy? (compara totales y saldos) */
+export function cierreDesactualizado(guardado: Omit<ResumenMes, 'clave' | 'renglones'>, actual: ResumenMes): boolean {
+  const campos = ['saldo_inicial', 'efectivo', 'gastos', 'retiros', 'ingresos', 'saldo_final'] as const
+  return campos.some((c) => centavos(Number(guardado[c])) !== centavos(actual[c]))
+}
+
+const NOMBRES_MES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+export const nombreMes = (mes: number) => NOMBRES_MES[mes - 1]

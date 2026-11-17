@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AporteEvento, MovimientoManual } from './calculos/cajaFuerte'
+import type { AporteEvento, MovimientoManual, RenglonResumen, ResumenMes } from './calculos/cajaFuerte'
 import { mandarAPapelera } from './papelera'
 import { supabase } from './supabase/cliente'
 import { useLocalId } from './sesion'
@@ -29,10 +29,13 @@ export function useCajaFuerte(habilitada = true) {
         sb.rpc('caja_fuerte_eventos', { p_local: localId }),
         sb.from('caja_fuerte_movimientos').select('*, autor:perfiles(nombre)').eq('local_id', localId).order('fecha'),
       ])
-      const eventos = (lanzar(ev) as { evento_id: string; fecha: string; nombre: string; efectivo: number; gastos: number }[]).map((e) => ({
+      const eventos = (
+        lanzar(ev) as { evento_id: string; fecha: string; nombre: string; efectivo: number; gastos: number; gastos_detalle?: { detalle: string; monto: number }[] }[]
+      ).map((e) => ({
         ...e,
         efectivo: Number(e.efectivo),
         gastos: Number(e.gastos),
+        gastos_detalle: (e.gastos_detalle ?? []).map((g) => ({ detalle: g.detalle, monto: Number(g.monto) })),
       })) as AporteEvento[]
       const manuales = (lanzar(mov) as { id: string; tipo: 'retiro' | 'ingreso'; monto: number; detalle: string; fecha: string; autor?: { nombre: string } | null }[]).map(
         (m) => ({ id: m.id, tipo: m.tipo, monto: Number(m.monto), detalle: m.detalle, fecha: aLocal(m.fecha), autor: m.autor?.nombre ?? null }),
@@ -64,5 +67,59 @@ export function useBorrarMovimientoCajaFuerte() {
       qc.invalidateQueries({ queryKey: ['caja-fuerte'] })
       qc.invalidateQueries({ queryKey: ['papelera'] })
     },
+  })
+}
+
+// ------------------------------------------------------------------ Cierres mensuales (no se borran)
+
+export interface CierreMes {
+  id: string
+  anio: number
+  mes: number
+  saldo_inicial: number
+  efectivo: number
+  gastos: number
+  retiros: number
+  ingresos: number
+  saldo_final: number
+  renglones: RenglonResumen[]
+  cerrado_en: string
+  actualizado_en: string
+}
+
+export function useCierres(habilitada = true) {
+  const localId = useLocalId()
+  return useQuery({
+    queryKey: ['caja-fuerte-cierres', localId],
+    enabled: !!localId && habilitada,
+    queryFn: async () => {
+      const filas = lanzar(await supabase().from('caja_fuerte_cierres').select('*').eq('local_id', localId).order('anio').order('mes')) as CierreMes[]
+      const num = (v: unknown) => Number(v)
+      return filas.map((c) => ({
+        ...c,
+        saldo_inicial: num(c.saldo_inicial),
+        efectivo: num(c.efectivo),
+        gastos: num(c.gastos),
+        retiros: num(c.retiros),
+        ingresos: num(c.ingresos),
+        saldo_final: num(c.saldo_final),
+      }))
+    },
+  })
+}
+
+/** Guarda (o actualiza) el resumen fijo de un mes terminado. */
+export function useGuardarCierre() {
+  const localId = useLocalId()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ resumen, id }: { resumen: ResumenMes; id?: string }) => {
+      const { clave: _c, ...datos } = resumen
+      void _c
+      const sb = supabase()
+      if (id) lanzar(await sb.from('caja_fuerte_cierres').update(datos).eq('id', id).select('id').single())
+      else lanzar(await sb.from('caja_fuerte_cierres').insert({ ...datos, local_id: localId }).select('id').single())
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['caja-fuerte-cierres'] }),
   })
 }
