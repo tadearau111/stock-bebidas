@@ -5,6 +5,7 @@ import { Aviso, Boton, Campo, Tarjeta, cx } from '@/components/ui'
 import { CAJA_VACIA, calcularCaja, textoDiferencia, type DatosCaja } from '@/lib/calculos/caja'
 import { ejecutar, useCambioEvento } from '@/lib/eventos'
 import { ahoraParaInput, formatoFechaHora, formatoHora, formatoPesos, leerPrecio, mensajeError } from '@/lib/formato'
+import { mandarAPapelera } from '@/lib/papelera'
 import { useLocalId } from '@/lib/sesion'
 import type { DetalleEvento, GastoDB } from '@/lib/tipos'
 
@@ -182,9 +183,9 @@ function Gastos({ gastos, eventoId, total }: { gastos: GastoDB[]; eventoId: stri
   }
 
   async function borrar(g: GastoDB) {
-    if (!confirm(`¿Borrar el gasto "${g.detalle}" de ${formatoPesos(g.monto)}?`)) return
+    if (!confirm(`¿Borrar el gasto "${g.detalle}" de ${formatoPesos(g.monto)}? Va a la papelera durante 30 días.`)) return
     try {
-      await cambio.mutateAsync((sb) => ejecutar(sb.from('evento_gastos').delete().eq('id', g.id)))
+      await cambio.mutateAsync(() => mandarAPapelera('gasto', g.id))
     } catch (e) {
       setError(mensajeError(e))
     }

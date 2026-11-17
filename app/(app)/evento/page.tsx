@@ -85,9 +85,9 @@ function Evento() {
 
   async function borrarEvento() {
     const aviso =
-      `¿BORRAR el evento "${evento.nombre}" para siempre?\n\n` +
+      `¿Borrar el evento "${evento.nombre}"?\n\n` +
       'Se borra todo lo cargado y lo consumido VUELVE AL DEPÓSITO: el stock va a subir como si esa bebida no se hubiera usado.\n\n' +
-      'Usalo solo para eventos de prueba o cargados por error. Si solo querés sacarlo de la lista, tocá "Archivar".\n\nNo se puede deshacer.'
+      'Usalo solo para eventos de prueba o cargados por error. Si solo querés sacarlo de la lista, tocá "Archivar".\n\nVa a la papelera: lo podés restaurar durante 30 días.'
     if (!confirm(aviso)) return
     try {
       await borrar.mutateAsync(id)

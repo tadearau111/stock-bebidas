@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase/cliente'
+import { mandarAPapelera } from './papelera'
 import { useLocalId } from './sesion'
 import type { NotaInfo } from './tipos'
 
@@ -38,7 +39,7 @@ export function useGuardarNota() {
 export function useBorrarNota() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (id: string) => lanzar(await supabase().from('notas_info').delete().eq('id', id)),
+    mutationFn: async (id: string) => mandarAPapelera('nota', id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notas-info'] }),
   })
 }

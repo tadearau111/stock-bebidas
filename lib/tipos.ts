@@ -69,6 +69,7 @@ export type Permiso =
   | 'historial.ver'
   | 'info.ver'
   | 'info.editar'
+  | 'papelera.gestionar'
 
 // ------------------------------------------------------------------ Eventos
 

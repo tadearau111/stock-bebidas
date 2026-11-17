@@ -257,7 +257,7 @@ function OpcionesArticulo({
   }
 
   async function eliminar() {
-    if (!confirm(`¿Eliminar "${a.nombre}"? No tiene movimientos, así que se borra por completo.`)) return
+    if (!confirm(`¿Eliminar "${a.nombre}"? Va a la papelera: lo podés restaurar durante 30 días.`)) return
     try {
       await borrar.mutateAsync(a.id)
       cerrar(`${a.nombre} eliminado.`)

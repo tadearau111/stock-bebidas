@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase/cliente'
+import { mandarAPapelera } from './papelera'
 import { useLocalId } from './sesion'
 import type { DetalleEvento, Evento } from './tipos'
 
@@ -168,11 +169,12 @@ export function useGuardarEvento() {
 export function useBorrarEvento() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (id: string) => ejecutar(supabase().from('eventos').delete().eq('id', id)),
+    mutationFn: async (id: string) => mandarAPapelera('evento', id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['eventos'] })
       qc.invalidateQueries({ queryKey: ['articulos'] })
       qc.invalidateQueries({ queryKey: ['stock-local'] })
+      qc.invalidateQueries({ queryKey: ['papelera'] })
     },
   })
 }

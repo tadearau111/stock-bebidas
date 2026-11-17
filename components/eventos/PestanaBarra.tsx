@@ -6,6 +6,7 @@ import { consumido, faltaEnDeposito, stockFinalValido, totalLlevado, totalReposi
 import { coincideBusqueda } from '@/lib/calculos/stock'
 import { useArticulos } from '@/lib/datos'
 import { ejecutar, useCambioEvento, useStockLocal } from '@/lib/eventos'
+import { mandarAPapelera } from '@/lib/papelera'
 import { useGuardarTrago, useTragos } from '@/lib/tragos'
 import { ahoraParaInput, detalleArticulo, formatoCantidad, formatoHora, formatoNumero, formatoVasos, mensajeError } from '@/lib/formato'
 import { useLocalId, useSesion } from '@/lib/sesion'
@@ -38,11 +39,11 @@ export function PestanaBarra({
 
   async function borrarBarra() {
     const texto = lineas.length
-      ? `¿Borrar "${barra.nombre}"? Se borran sus ${lineas.length} artículos con todo lo cargado, y el stock vuelve al depósito.`
-      : `¿Borrar "${barra.nombre}"?`
+      ? `¿Borrar "${barra.nombre}"? Se borran sus ${lineas.length} artículos con todo lo cargado, y el stock vuelve al depósito.\n\nVa a la papelera: la podés restaurar durante 30 días.`
+      : `¿Borrar "${barra.nombre}"? Va a la papelera durante 30 días.`
     if (!confirm(texto)) return
     try {
-      await cambio.mutateAsync((sb) => ejecutar(sb.from('barras').delete().eq('id', barra.id)))
+      await cambio.mutateAsync(() => mandarAPapelera('barra', barra.id))
       alBorrar()
     } catch (e) {
       setError(mensajeError(e))
@@ -51,9 +52,9 @@ export function PestanaBarra({
 
   async function quitarLinea(l: LineaBarraDB) {
     const cargado = l.stock_inicial > 0 || l.reposiciones.length > 0 || l.stock_final != null
-    if (cargado && !confirm(`¿Quitar ${l.articulo.nombre} de esta barra? Se borra lo cargado y vuelve al depósito.`)) return
+    if (cargado && !confirm(`¿Quitar ${l.articulo.nombre} de esta barra? Lo cargado vuelve al depósito. Va a la papelera durante 30 días.`)) return
     try {
-      await cambio.mutateAsync((sb) => ejecutar(sb.from('barra_articulos').delete().eq('id', l.id)))
+      await cambio.mutateAsync(() => mandarAPapelera('linea', l.id))
     } catch (e) {
       setError(mensajeError(e))
     }
@@ -395,9 +396,9 @@ function EditarReposiciones({ linea, eventoId }: { linea: LineaBarraDB; eventoId
   }
 
   async function borrar(id: string) {
-    if (!confirm('¿Borrar esta reposición? Vuelve al depósito y queda en el historial.')) return
+    if (!confirm('¿Borrar esta reposición? Vuelve al depósito y va a la papelera durante 30 días.')) return
     try {
-      await cambio.mutateAsync((sb) => ejecutar(sb.from('reposiciones').delete().eq('id', id)))
+      await cambio.mutateAsync(() => mandarAPapelera('reposicion', id))
     } catch (err) {
       setError(mensajeError(err))
     }
@@ -582,9 +583,9 @@ function SeccionRetiros({
   const [error, setError] = useState('')
 
   async function borrar(r: RetiroDB) {
-    if (!confirm(`¿Borrar el retiro de ${r.cantidad} ${r.articulo?.nombre ?? r.trago?.nombre ?? ''}?`)) return
+    if (!confirm(`¿Borrar el retiro de ${r.cantidad} ${r.articulo?.nombre ?? r.trago?.nombre ?? ''}? Va a la papelera durante 30 días.`)) return
     try {
-      await cambio.mutateAsync((sb) => ejecutar(sb.from('retiros').delete().eq('id', r.id)))
+      await cambio.mutateAsync(() => mandarAPapelera('retiro', r.id))
     } catch (err) {
       setError(mensajeError(err))
     }

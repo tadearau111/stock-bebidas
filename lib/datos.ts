@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabase/cliente'
+import { mandarAPapelera } from './papelera'
 import { useLocalId } from './sesion'
 import type { Articulo, ArticuloEditable, Movimiento } from './tipos'
 
@@ -55,7 +56,7 @@ export function useBorrarArticulo() {
   const refrescar = useRefrescarDeposito()
   return useMutation({
     mutationFn: async (id: string) => {
-      lanzar(await supabase().from('articulos').delete().eq('id', id))
+      await mandarAPapelera('articulo', id)
     },
     onSuccess: refrescar,
   })
@@ -127,7 +128,7 @@ export function useAnularMovimiento() {
   const refrescar = useRefrescarDeposito()
   return useMutation({
     mutationFn: async (id: string) => {
-      lanzar(await supabase().from('movimientos').delete().eq('id', id))
+      await mandarAPapelera('movimiento', id)
     },
     onSuccess: refrescar,
   })

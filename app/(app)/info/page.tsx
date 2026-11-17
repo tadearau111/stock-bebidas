@@ -218,7 +218,7 @@ function FormNota({ nota, alTerminar }: { nota?: NotaInfo; alTerminar: () => voi
   }
 
   async function eliminar() {
-    if (!nota || !confirm(`¿Borrar la nota "${nota.titulo}"?`)) return
+    if (!nota || !confirm(`¿Borrar la nota "${nota.titulo}"? Va a la papelera durante 30 días.`)) return
     try {
       await borrar.mutateAsync(nota.id)
       alTerminar()

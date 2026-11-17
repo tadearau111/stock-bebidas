@@ -153,7 +153,7 @@ function FormCorregir({ movimiento: m, alTerminar }: { movimiento: Movimiento; a
   }
 
   async function borrar() {
-    if (!confirm('¿Anular este movimiento? El stock se recalcula y queda registrado en el historial.')) return
+    if (!confirm('¿Anular este movimiento? El stock se recalcula. Va a la papelera: lo podés restaurar durante 30 días.')) return
     try {
       await anular.mutateAsync(m.id)
       alTerminar()

@@ -7,6 +7,7 @@ import { coincideBusqueda } from '@/lib/calculos/stock'
 import { useArticulos } from '@/lib/datos'
 import { ejecutar, useCambioEvento } from '@/lib/eventos'
 import { formatoHora, mensajeError } from '@/lib/formato'
+import { mandarAPapelera } from '@/lib/papelera'
 import { useLocalId } from '@/lib/sesion'
 import type { DetalleEvento } from '@/lib/tipos'
 
@@ -51,9 +52,9 @@ export function PestanaBebidaAbierta({ detalle }: { detalle: DetalleEvento }) {
   }
 
   async function borrar(id: string) {
-    if (!confirm('¿Borrar esta carga?')) return
+    if (!confirm('¿Borrar esta carga? Va a la papelera durante 30 días.')) return
     try {
-      await cambio.mutateAsync((sb) => ejecutar(sb.from('bebida_abierta').delete().eq('id', id)))
+      await cambio.mutateAsync(() => mandarAPapelera('bebida_abierta', id))
     } catch (e) {
       setError(mensajeError(e))
     }
