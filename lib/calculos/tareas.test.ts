@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { armarLibro, resumirPorMes } from './cajaFuerte'
-import { moverSemanas, nombresUsados, resumirMesTareas, resumirSemana } from './tareas'
+import { nombresUsados, resumirMesTareas } from './tareas'
 
 const pago = (id: string, fecha: string, persona: string, monto: number, horas: number | null = null) => ({
   id,
@@ -20,32 +20,9 @@ const movs = [
   { id: 'r1', tipo: 'retiro' as const, monto: 5_000, detalle: 'Otro', fecha: '2026-11-17T10:00:00' },
 ]
 
-describe('Tareas de la semana', () => {
-  const s = resumirSemana(movs, new Date(2026, 10, 18))
-  it('toma solo los pagos de lunes a domingo', () => {
-    expect([s.desde, s.hasta]).toEqual(['2026-11-16', '2026-11-22'])
-    expect(s.pagos.map((p) => p.id)).toEqual(['p1', 'p2', 'p3'])
-    expect(s.total).toBe(45_000)
-    expect(s.horas).toBe(9.5)
-  })
-  it('suma por persona (sin importar mayúsculas)', () => {
-    expect(s.porPersona).toEqual([
-      { persona: 'Juan Pérez', total: 30_000, horas: 6.5, pagos: 2 },
-      { persona: 'Ana', total: 15_000, horas: 3, pagos: 1 },
-    ])
-  })
-  it('agrupa por día', () => {
-    expect(s.porDia.map((d) => [d.dia, d.total])).toEqual([
-      ['2026-11-16', 20_000],
-      ['2026-11-18', 15_000],
-      ['2026-11-22', 10_000],
-    ])
-  })
+describe('Tareas: pagos', () => {
   it('sugiere los nombres usados', () => {
     expect(nombresUsados(movs)).toEqual(['Juan Pérez', 'Ana'])
-  })
-  it('mueve de semana', () => {
-    expect(resumirSemana(movs, moverSemanas(s.desde, 1)).pagos.map((p) => p.id)).toEqual(['p4'])
   })
   it('los pagos se restan del efectivo de la caja fuerte', () => {
     const libro = armarLibro([{ evento_id: 'e', fecha: '2026-11-14', nombre: 'Casamiento', efectivo: 200_000, gastos: 0 }], movs)
@@ -69,9 +46,9 @@ describe('Tareas: resumen mensual', () => {
       ['Juan Pérez', 129_000],
       ['Ana', 15_000],
     ])
-    expect(r.porSemana.map((s) => [s.desde, s.total])).toEqual([
-      ['2026-11-16', 45_000],
-      ['2026-11-23', 99_000],
+    expect(r.porSemana.map((s) => [s.desde, s.hasta, s.total, s.lista.map((p) => p.ref)])).toEqual([
+      ['2026-11-16', '2026-11-22', 45_000, ['p1', 'p2', 'p3']],
+      ['2026-11-23', '2026-11-29', 99_000, ['p4']],
     ])
   })
   it('los datos del pago viajan en el renglón guardado (JSON)', () => {

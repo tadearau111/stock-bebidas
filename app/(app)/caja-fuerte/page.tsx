@@ -224,8 +224,8 @@ function FilaMes({ r, editar }: { r: RenglonResumen; editar?: () => void }) {
             <>
               {' '}
               ·{' '}
-              <Link href={`/tareas-semana?dia=${r.fecha.slice(0, 10)}`} className="text-marca-700 underline">
-                Ver en Tareas semana
+              <Link href={`/tareas-semana?mes=${r.fecha.slice(0, 7)}`} className="text-marca-700 underline">
+                Ver en Tareas
               </Link>
             </>
           )}

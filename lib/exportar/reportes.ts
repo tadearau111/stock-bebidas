@@ -18,7 +18,7 @@ import {
 } from '../calculos/evento'
 import { CAJA_VACIA, cajaCargada, calcularCaja } from '../calculos/caja'
 import { nombreMes, type RenglonResumen } from '../calculos/cajaFuerte'
-import type { ResumenMesTareas, ResumenSemana } from '../calculos/tareas'
+import type { ResumenMesTareas } from '../calculos/tareas'
 import type { Articulo, DetalleEvento } from '../tipos'
 
 export type Celda = string | number | null
@@ -521,44 +521,6 @@ export function reporteCajaFuerteMes(
 }
 
 // ------------------------------------------------------------------ Tareas de la semana
-
-export function reporteTareasSemana(s: ResumenSemana, local: string): Reporte {
-  const dma = (f: string) => f.slice(0, 10).split('-').reverse().join('/')
-  const horas = (h: number | null | undefined) => (h ? h.toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '')
-  const rango = `${dma(s.desde)} al ${dma(s.hasta)}`
-  return {
-    titulo: 'Tareas de la semana',
-    subtitulo: `${local} · Semana del ${rango}`,
-    datos: [
-      ['Total pagado', textoCelda(s.total, 'pesos')],
-      ['Pagos', String(s.pagos.length)],
-      ...(s.horas ? ([['Horas trabajadas', horas(s.horas)]] as [string, string][]) : []),
-    ],
-    secciones: [
-      {
-        titulo: 'Por persona',
-        columnas: [{ titulo: 'Persona' }, { titulo: 'Pagos', tipo: 'numero' }, { titulo: 'Horas', tipo: 'numero' }, { titulo: 'Total', tipo: 'pesos' }],
-        filas: s.porPersona.map((p) => [p.persona, p.pagos, p.horas || null, p.total]),
-        total: ['Total', s.pagos.length, s.horas || null, s.total],
-        nota: s.pagos.length === 0 ? 'Sin pagos en la semana.' : undefined,
-      },
-      {
-        titulo: 'Detalle día por día',
-        columnas: [{ titulo: 'Día' }, { titulo: 'Persona' }, { titulo: 'Tareas' }, { titulo: 'Horas', tipo: 'numero' }, { titulo: 'Monto', tipo: 'pesos' }],
-        filas: s.pagos.map((p) => [dma(p.fecha), p.persona ?? '', p.detalle, p.horas ?? null, p.monto]),
-        total: ['Total', null, null, s.horas || null, s.total],
-      },
-    ],
-    textoWhatsApp: [
-      `*Tareas de la semana · ${rango}*`,
-      ...s.pagos.map((p) => `• ${dma(p.fecha)} ${p.persona}: ${p.detalle}${p.horas ? ` (${horas(p.horas)} h)` : ''} — ${textoCelda(p.monto, 'pesos')}`),
-      '',
-      ...s.porPersona.map((p) => `${p.persona}: ${textoCelda(p.total, 'pesos')}${p.horas ? ` · ${horas(p.horas)} h` : ''}`),
-      `*Total pagado: ${textoCelda(s.total, 'pesos')}*`,
-    ].join('\n'),
-    nombreArchivo: `tareas-semana-${s.desde}`,
-  }
-}
 
 export function reporteTareasMes(anio: number, mes: number, r: ResumenMesTareas, local: string, estado: string): Reporte {
   const nombre = `${nombreMes(mes)} ${anio}`
