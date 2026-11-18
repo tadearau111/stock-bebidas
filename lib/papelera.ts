@@ -16,6 +16,8 @@ export type TipoPapelera =
   | 'nota'
   | 'articulo'
   | 'caja_fuerte'
+  | 'cajero'
+  | 'retiro_cajero'
 
 export interface ItemPapelera {
   id: string

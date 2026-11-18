@@ -86,6 +86,8 @@ const detalle: DetalleEvento = {
   ],
   caja: null,
   gastos: [],
+  cajeros: [],
+  retirosCajeros: [],
 }
 
 describe('Resumen de evento', () => {

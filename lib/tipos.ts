@@ -161,6 +161,25 @@ export interface GastoDB {
   autor?: { nombre: string } | null
 }
 
+/** Cajero de la noche (solo para controlar los retiros de dinero) */
+export interface CajeroDB {
+  id: string
+  evento_id: string
+  nombre: string
+  orden: number
+}
+
+/** Retiro de dinero que se le hace a un cajero durante la noche (solo control) */
+export interface RetiroCajeroDB {
+  id: string
+  cajero_id: string
+  evento_id: string
+  monto: number
+  hora: string
+  notas: string | null
+  autor?: { nombre: string } | null
+}
+
 export interface DetalleEvento {
   evento: Evento
   barras: Barra[]
@@ -169,6 +188,8 @@ export interface DetalleEvento {
   bebidaAbierta: BebidaAbiertaDB[]
   caja: CajaDB | null
   gastos: GastoDB[]
+  cajeros: CajeroDB[]
+  retirosCajeros: RetiroCajeroDB[]
 }
 
 // ------------------------------------------------------------------ Info

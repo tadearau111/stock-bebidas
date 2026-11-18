@@ -9,6 +9,7 @@ import { TIPOS_BARRA } from '@/lib/calculos/evento'
 import { PestanaBarra } from '@/components/eventos/PestanaBarra'
 import { PestanaBebidaAbierta } from '@/components/eventos/PestanaBebidaAbierta'
 import { PestanaCaja } from '@/components/eventos/PestanaCaja'
+import { PestanaCajeros } from '@/components/eventos/PestanaCajeros'
 import { PestanaCostos } from '@/components/eventos/PestanaCostos'
 import { PestanaResumen } from '@/components/eventos/PestanaResumen'
 import { Aviso, Boton, Cargando, Ventana, cx } from '@/components/ui'
@@ -59,7 +60,7 @@ function Evento() {
   const barraActiva = barras.find((b) => b.id === pestana)
   // La pestaña Costos la ve quien gestiona eventos (los encargados de la noche no ven precios ahí)
   const verCostos = puede('eventos.gestionar')
-  const fijas = ['abierta', 'resumen', ...(verCostos ? ['costos'] : []), 'caja']
+  const fijas = ['abierta', 'resumen', ...(verCostos ? ['costos'] : []), 'cajeros', 'caja']
   const actual = barraActiva ? barraActiva.id : fijas.includes(pestana) ? pestana : (barras[0]?.id ?? 'resumen')
   const barraMostrada = barras.find((b) => b.id === actual)
 
@@ -105,6 +106,7 @@ function Evento() {
     { id: 'abierta', nombre: 'Bebida abierta' },
     { id: 'resumen', nombre: 'Resumen' },
     ...(verCostos ? [{ id: 'costos', nombre: 'Costos' }] : []),
+    { id: 'cajeros', nombre: 'Cajeros' },
     { id: 'caja', nombre: 'Caja' },
   ]
 
@@ -187,6 +189,8 @@ function Evento() {
       ) : (
         actual === 'costos' ? (
           <PestanaCostos detalle={detalle} />
+        ) : actual === 'cajeros' ? (
+          <PestanaCajeros detalle={detalle} />
         ) : actual === 'caja' ? (
           <PestanaCaja key={detalle.caja?.actualizado_en ?? 'nueva'} detalle={detalle} />
         ) : (

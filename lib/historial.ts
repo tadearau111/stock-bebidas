@@ -29,6 +29,8 @@ const SUJETOS: Record<string, string> = {
   caja_fuerte_movimientos: 'movimiento de caja fuerte',
   evento_caja: 'caja del evento',
   evento_gastos: 'gasto de la noche',
+  evento_cajeros: 'cajero del evento',
+  cajero_retiros: 'retiro de dinero a un cajero',
   movimientos: 'movimiento del depósito',
   eventos: 'evento',
   barras: 'barra',
@@ -46,7 +48,7 @@ const SUJETOS: Record<string, string> = {
 export const AREAS: Record<string, string[]> = {
   'Depósito y artículos': ['articulos', 'movimientos', 'tragos', 'proveedores'],
   Eventos: ['eventos', 'barras', 'barra_articulos', 'reposiciones', 'retiros', 'bebida_abierta', 'evento_asignaciones'],
-  Caja: ['evento_caja', 'evento_gastos', 'caja_fuerte_movimientos'],
+  Caja: ['evento_caja', 'evento_gastos', 'evento_cajeros', 'cajero_retiros', 'caja_fuerte_movimientos'],
   Info: ['notas_info'],
   'Usuarios y permisos': ['perfiles', 'miembros', 'roles', 'rol_permisos'],
 }
@@ -103,6 +105,7 @@ const CAMPOS: Record<string, string> = {
   detalle: 'Detalle',
   persona: 'A quién',
   horas: 'Horas',
+  cajero_id: 'Cajero',
 }
 
 // Columnas técnicas que no aportan nada a quien lee

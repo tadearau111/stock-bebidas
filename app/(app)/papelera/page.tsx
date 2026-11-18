@@ -18,6 +18,8 @@ const TIPOS: Record<TipoPapelera, string> = {
   nota: 'Info',
   articulo: 'Artículo',
   caja_fuerte: 'Caja fuerte',
+  cajero: 'Cajero',
+  retiro_cajero: 'Retiro a cajero',
 }
 
 export default function PaginaPapelera() {

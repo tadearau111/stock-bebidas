@@ -18,6 +18,7 @@ import {
 } from '../calculos/evento'
 import { CAJA_VACIA, cajaCargada, calcularCaja } from '../calculos/caja'
 import { nombreMes, type RenglonResumen } from '../calculos/cajaFuerte'
+import { resumirCajeros } from '../calculos/cajeros'
 import type { ResumenMesTareas } from '../calculos/tareas'
 import type { Articulo, DetalleEvento } from '../tipos'
 
@@ -390,6 +391,22 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
         total: ['Total gastos', caja.totalGastos, null],
       })
     }
+  }
+
+  // Retiros de dinero a los cajeros (solo control)
+  const cajeros = resumirCajeros(detalle.cajeros ?? [], detalle.retirosCajeros ?? [])
+  if (cajeros.cantidad) {
+    secciones.push({
+      titulo: 'Retiros a cajeros (control)',
+      columnas: [{ titulo: 'Cajero' }, { titulo: 'Hora' }, { titulo: 'Notas' }, { titulo: 'Monto', tipo: 'pesos' }],
+      filas: cajeros.cajeros.flatMap((c) =>
+        c.retiros.length
+          ? c.retiros.map((r) => [c.cajero.nombre, fechaHora.format(new Date(r.hora)).replace(/\u00a0|\u202f/g, ' '), r.notas ?? '', r.monto] as Celda[])
+          : ([[c.cajero.nombre, null, 'Sin retiros', 0]] as Celda[][]),
+      ),
+      total: ['Total retirado a cajeros', null, null, cajeros.total],
+      nota: 'Solo control de seguridad: no suma ni resta en la venta ni en la caja. ' + cajeros.cajeros.map((c) => `${c.cajero.nombre}: ${textoCelda(c.total, 'pesos')}`).join(' · '),
+    })
   }
 
   const datos: [string, string][] = [

@@ -37,7 +37,7 @@ export function useEvento(id: string) {
     enabled: !!id,
     queryFn: async (): Promise<DetalleEvento | null> => {
       const sb = supabase()
-      const [ev, barras, lineas, retiros, abierta, caja, gastos] = await Promise.all([
+      const [ev, barras, lineas, retiros, abierta, caja, gastos, cajeros, retirosCajeros] = await Promise.all([
         sb.from('eventos').select('*').eq('id', id).maybeSingle(),
         sb.from('barras').select('*').eq('evento_id', id).order('orden').order('creado_en'),
         sb
@@ -58,6 +58,8 @@ export function useEvento(id: string) {
           .order('hora', { ascending: false }),
         sb.from('evento_caja').select('*').eq('evento_id', id).maybeSingle(),
         sb.from('evento_gastos').select('*, autor:perfiles(nombre)').eq('evento_id', id).order('hora'),
+        sb.from('evento_cajeros').select('*').eq('evento_id', id).order('orden').order('creado_en'),
+        sb.from('cajero_retiros').select('*, autor:perfiles(nombre)').eq('evento_id', id).order('hora'),
       ])
       const evento = lanzar(ev)
       if (!evento) return null
@@ -72,6 +74,8 @@ export function useEvento(id: string) {
         bebidaAbierta: lanzar(abierta) as DetalleEvento['bebidaAbierta'],
         caja: lanzar(caja) as DetalleEvento['caja'],
         gastos: lanzar(gastos) as DetalleEvento['gastos'],
+        cajeros: lanzar(cajeros) as DetalleEvento['cajeros'],
+        retirosCajeros: (lanzar(retirosCajeros) as DetalleEvento['retirosCajeros']).map((r) => ({ ...r, monto: Number(r.monto) })),
       }
     },
   })
