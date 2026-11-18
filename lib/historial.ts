@@ -101,13 +101,15 @@ const CAMPOS: Record<string, string> = {
   hora_cierre: 'Cierre',
   personal: 'Personal',
   detalle: 'Detalle',
+  persona: 'A quién',
+  horas: 'Horas',
 }
 
 // Columnas técnicas que no aportan nada a quien lee
 const OCULTAS = new Set(['id', 'local_id', 'creado_por', 'barra_id', 'barra_articulo_id', 'es_sistema', 'actualizado_por'])
 
 const VALORES: Record<string, Record<string, string>> = {
-  tipo: { ingreso: 'Ingreso', ajuste: 'Ajuste', personal: 'Personal', cortesia: 'Cortesía', detalle: 'Detallada', total: 'Total directo' },
+  tipo: { ingreso: 'Ingreso', ajuste: 'Ajuste', personal: 'Personal', cortesia: 'Cortesía', detalle: 'Detallada', total: 'Total directo', retiro: 'Retiro', pago: 'Pago de tareas' },
   unidad: { unidad: 'Unidad', bolsa: 'Bolsa' },
   tipo_barra: { propia: 'Barra propia', concesionada: 'Barra concesionada' },
   cuartos: { '1': '¼', '2': '½', '3': '¾', '4': 'Entera' },
@@ -163,6 +165,7 @@ export function describir(r: RegistroAuditoria, nombres?: Nombres): Descripcion 
   // Casos con frases más naturales
   const tipoMov = (r.cambios.tipo?.despues ?? r.cambios.tipo?.antes) as string | undefined
   if (r.tabla === 'movimientos' && tipoMov) titulo = `${verbo} un ${tipoMov === 'ingreso' ? 'ingreso' : 'ajuste'} de stock`
+  if (r.tabla === 'caja_fuerte_movimientos' && tipoMov === 'pago') titulo = `${verbo} un pago de tareas`
   if (r.tabla === 'perfiles' && r.cambios.activo && r.accion === 'modificacion') {
     titulo = r.cambios.activo.despues ? 'reactivó un usuario' : 'desactivó un usuario'
   }

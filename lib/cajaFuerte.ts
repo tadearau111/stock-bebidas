@@ -37,9 +37,17 @@ export function useCajaFuerte(habilitada = true) {
         gastos: Number(e.gastos),
         gastos_detalle: (e.gastos_detalle ?? []).map((g) => ({ detalle: g.detalle, monto: Number(g.monto) })),
       })) as AporteEvento[]
-      const manuales = (lanzar(mov) as { id: string; tipo: 'retiro' | 'ingreso'; monto: number; detalle: string; fecha: string; autor?: { nombre: string } | null }[]).map(
-        (m) => ({ id: m.id, tipo: m.tipo, monto: Number(m.monto), detalle: m.detalle, fecha: aLocal(m.fecha), autor: m.autor?.nombre ?? null }),
-      ) as MovimientoManual[]
+      type Fila = Omit<MovimientoManual, 'autor'> & { autor?: { nombre: string } | null }
+      const manuales = (lanzar(mov) as Fila[]).map((m) => ({
+        id: m.id,
+        tipo: m.tipo,
+        monto: Number(m.monto),
+        detalle: m.detalle,
+        fecha: aLocal(m.fecha),
+        persona: m.persona ?? null,
+        horas: m.horas != null ? Number(m.horas) : null,
+        autor: m.autor?.nombre ?? null,
+      })) as MovimientoManual[]
       return { eventos, manuales }
     },
   })
@@ -49,7 +57,7 @@ export function useMovimientoCajaFuerte() {
   const localId = useLocalId()
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (m: { id?: string; tipo: 'retiro' | 'ingreso'; monto: number; detalle: string; fecha: string }) => {
+    mutationFn: async (m: { id?: string; tipo: MovimientoManual['tipo']; monto: number; detalle: string; fecha: string; persona?: string | null; horas?: number | null }) => {
       const sb = supabase()
       const { id, ...datos } = m
       if (id) lanzar(await sb.from('caja_fuerte_movimientos').update(datos).eq('id', id).select('id').single())
@@ -81,6 +89,7 @@ export interface CierreMes {
   gastos: number
   retiros: number
   ingresos: number
+  pagos: number
   saldo_final: number
   renglones: RenglonResumen[]
   cerrado_en: string
@@ -102,6 +111,7 @@ export function useCierres(habilitada = true) {
         gastos: num(c.gastos),
         retiros: num(c.retiros),
         ingresos: num(c.ingresos),
+        pagos: num(c.pagos ?? 0),
         saldo_final: num(c.saldo_final),
       }))
     },

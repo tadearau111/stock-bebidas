@@ -13,9 +13,13 @@ export interface AporteEvento {
 
 export interface MovimientoManual {
   id: string
-  tipo: 'retiro' | 'ingreso'
+  tipo: 'retiro' | 'ingreso' | 'pago'
   monto: number
   detalle: string
+  /** En los pagos de tareas: a quién se le pagó */
+  persona?: string | null
+  /** En los pagos de tareas: horas trabajadas (opcional) */
+  horas?: number | null
   fecha: string // ISO
   autor?: string | null
 }
@@ -23,7 +27,7 @@ export interface MovimientoManual {
 export type Renglon =
   | { clase: 'efectivo'; clave: string; fecha: string; evento: AporteEvento; monto: number; saldo: number }
   | { clase: 'gastos'; clave: string; fecha: string; evento: AporteEvento; monto: number; saldo: number }
-  | { clase: 'retiro' | 'ingreso'; clave: string; fecha: string; mov: MovimientoManual; monto: number; saldo: number }
+  | { clase: 'retiro' | 'ingreso' | 'pago'; clave: string; fecha: string; mov: MovimientoManual; monto: number; saldo: number }
 
 export interface LibroCajaFuerte {
   renglones: Renglon[] // en orden cronológico, con el saldo después de cada uno
@@ -32,9 +36,13 @@ export interface LibroCajaFuerte {
   totalGastos: number
   totalRetiros: number
   totalIngresos: number
+  totalPagos: number
 }
 
 const centavos = (v: number) => Math.round(v * 100) / 100
+
+/** 4 → "4 h", 1.5 → "1,5 h" */
+export const textoHoras = (h: number) => `${h.toLocaleString('es-AR', { maximumFractionDigits: 2 })} h`
 
 /** Renglón todavía sin el saldo calculado (Omit que respeta cada variante). */
 type SinSaldo<T> = T extends unknown ? Omit<T, 'saldo'> : never
@@ -53,7 +61,7 @@ export function armarLibro(eventos: AporteEvento[], manuales: MovimientoManual[]
     if (filas.length) bloques.push({ fecha: e.fecha, orden: claveOrden(e.fecha), filas })
   }
   for (const m of manuales) {
-    const monto = m.tipo === 'retiro' ? -centavos(m.monto) : centavos(m.monto)
+    const monto = m.tipo === 'ingreso' ? centavos(m.monto) : -centavos(m.monto)
     bloques.push({ fecha: m.fecha, orden: claveOrden(m.fecha), filas: [{ clase: m.tipo, clave: m.id, fecha: m.fecha, mov: m, monto }] })
   }
   bloques.sort((a, b) => a.orden.localeCompare(b.orden))
@@ -75,6 +83,7 @@ export function armarLibro(eventos: AporteEvento[], manuales: MovimientoManual[]
     totalGastos: suma('gastos'),
     totalRetiros: suma('retiro'),
     totalIngresos: suma('ingreso'),
+    totalPagos: suma('pago'),
   }
 }
 
@@ -91,7 +100,7 @@ export interface RenglonResumen {
   evento_id: string | null
   /** En los renglones de gastos: el detalle de cada gasto */
   items?: { detalle: string; monto: number }[]
-  /** En retiros/ingresos: id del movimiento (para editarlo) */
+  /** En retiros/ingresos/pagos: id del movimiento (para editarlo) */
   ref?: string
 }
 
@@ -104,6 +113,8 @@ export interface ResumenMes {
   gastos: number
   retiros: number
   ingresos: number
+  /** Pagos de tareas de la semana (sueldos, changas) */
+  pagos: number
   saldo_final: number
   renglones: RenglonResumen[]
 }
@@ -124,8 +135,12 @@ export function aRenglonResumen(r: Renglon): RenglonResumen {
   return {
     clase: r.clase,
     fecha: r.fecha,
-    titulo: r.clase === 'retiro' ? 'Retiro' : 'Ingreso',
-    detalle: r.mov.detalle + (r.mov.autor ? ` (cargó ${r.mov.autor})` : ''),
+    titulo: r.clase === 'retiro' ? 'Retiro' : r.clase === 'pago' ? 'Pago de tareas' : 'Ingreso',
+    detalle:
+      (r.clase === 'pago' && r.mov.persona ? `${r.mov.persona}: ` : '') +
+      r.mov.detalle +
+      (r.clase === 'pago' && r.mov.horas ? ` (${textoHoras(r.mov.horas)})` : '') +
+      (r.mov.autor ? ` (cargó ${r.mov.autor})` : ''),
     monto: r.monto,
     saldo: r.saldo,
     evento_id: null,
@@ -165,6 +180,7 @@ export function resumirPorMes(libro: LibroCajaFuerte, hoy = new Date()): Resumen
       gastos: suma('gastos'),
       retiros: suma('retiro'),
       ingresos: suma('ingreso'),
+      pagos: suma('pago'),
       saldo_final: saldo,
       renglones: rs.map(aRenglonResumen),
     }
@@ -172,9 +188,9 @@ export function resumirPorMes(libro: LibroCajaFuerte, hoy = new Date()): Resumen
 }
 
 /** ¿Lo guardado en el cierre es distinto a lo que da hoy? (compara totales y saldos) */
-export function cierreDesactualizado(guardado: Omit<ResumenMes, 'clave' | 'renglones'>, actual: ResumenMes): boolean {
-  const campos = ['saldo_inicial', 'efectivo', 'gastos', 'retiros', 'ingresos', 'saldo_final'] as const
-  return campos.some((c) => centavos(Number(guardado[c])) !== centavos(actual[c]))
+export function cierreDesactualizado(guardado: Omit<ResumenMes, 'clave' | 'renglones' | 'pagos'> & { pagos?: number }, actual: ResumenMes): boolean {
+  const campos = ['saldo_inicial', 'efectivo', 'gastos', 'retiros', 'ingresos', 'pagos', 'saldo_final'] as const
+  return campos.some((c) => centavos(Number(guardado[c] ?? 0)) !== centavos(actual[c]))
 }
 
 const NOMBRES_MES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -225,11 +241,11 @@ export function encadenarMeses(meses: ResumenMes[], cierres: CierreGuardado[], h
   const salida: MesEncadenado[] = []
   for (const k of claves) {
     const [anio, mes] = k.split('-').map(Number)
-    const base: ResumenMes = vivos.get(k) ?? { anio, mes, clave: k, saldo_inicial: 0, efectivo: 0, gastos: 0, retiros: 0, ingresos: 0, saldo_final: 0, renglones: [] }
+    const base: ResumenMes = vivos.get(k) ?? { anio, mes, clave: k, saldo_inicial: 0, efectivo: 0, gastos: 0, retiros: 0, ingresos: 0, pagos: 0, saldo_final: 0, renglones: [] }
     const vivo = desdeSaldo(base, arrastre)
     const guardado = guardados.get(k) ?? null
     const desactualizado = !!guardado && cierreDesactualizado(guardado, vivo)
-    const mostrado: ResumenMes = guardado ? { ...guardado, clave: k } : vivo
+    const mostrado: ResumenMes = guardado ? { ...guardado, pagos: Number(guardado.pagos ?? 0), clave: k } : vivo
     salida.push({ clave: k, anio, mes, vivo, guardado, mostrado, desactualizado })
     arrastre = mostrado.saldo_final
   }

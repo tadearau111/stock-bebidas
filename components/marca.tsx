@@ -149,6 +149,14 @@ export const IconoPapelera = (p: Icono) => (
   </Base>
 )
 
+export const IconoTareas = (p: Icono) => (
+  <Base {...p}>
+    <rect x="5" y="4" width="14" height="17" rx="2" />
+    <path d="M9 4V3h6v1" />
+    <path d="M8.5 10l1.5 1.5 3-3M8.5 16h7M15 10.5h.5" />
+  </Base>
+)
+
 export const IconoCajaFuerte = (p: Icono) => (
   <Base {...p}>
     <rect x="3" y="4" width="18" height="15" rx="2" />

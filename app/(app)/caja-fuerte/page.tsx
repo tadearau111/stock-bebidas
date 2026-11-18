@@ -182,7 +182,8 @@ export default function PaginaCajaFuerte() {
                 <Total titulo="Gastos de eventos" valor={mostrado.gastos} signo="−" />
                 <Total titulo="Retiros" valor={mostrado.retiros} signo="−" />
                 <Total titulo="Ingresos manuales" valor={mostrado.ingresos} signo="+" />
-                <Total titulo={clave === actual ? 'Saldo hasta hoy' : 'Saldo al cierre del mes'} valor={mostrado.saldo_final} destacado />
+                <Total titulo="Pagos de tareas" valor={mostrado.pagos ?? 0} signo="−" />
+                <Total titulo={clave === actual ? 'Saldo hasta hoy' : 'Saldo al cierre del mes'} valor={mostrado.saldo_final} destacado className="col-span-2 sm:col-span-3" />
               </div>
 
               {mostrado.renglones.length === 0 ? (
@@ -199,7 +200,8 @@ export default function PaginaCajaFuerte() {
                 <Tarjeta className="divide-y divide-borde">
                   {[...mostrado.renglones].reverse().map((r, n) => {
                     const mov = editable && r.ref ? data?.manuales.find((m) => m.id === r.ref) : undefined
-                    return <FilaMes key={`${r.ref ?? r.evento_id ?? ''}-${r.clase}-${n}`} r={r} editar={mov ? () => setEdicion({ tipo: mov.tipo, mov }) : undefined} />
+                    const editar = mov && mov.tipo !== 'pago' ? () => setEdicion({ tipo: mov.tipo as 'retiro' | 'ingreso', mov }) : undefined
+                    return <FilaMes key={`${r.ref ?? r.evento_id ?? ''}-${r.clase}-${n}`} r={r} editar={editar} />
                   })}
                 </Tarjeta>
               )}
@@ -243,6 +245,15 @@ function FilaMes({ r, editar }: { r: RenglonResumen; editar?: () => void }) {
               `${r.detalle} · `
             ))}
           {fecha}
+          {r.clase === 'pago' && (
+            <>
+              {' '}
+              ·{' '}
+              <Link href={`/tareas-semana?dia=${r.fecha.slice(0, 10)}`} className="text-marca-700 underline">
+                Ver en Tareas semana
+              </Link>
+            </>
+          )}
           {editar && (
             <>
               {' '}
@@ -285,9 +296,9 @@ function Monto({ monto, saldo }: { monto: number; saldo: number }) {
   )
 }
 
-function Total({ titulo, valor, signo, destacado }: { titulo: string; valor: number; signo?: '+' | '−'; destacado?: boolean }) {
+function Total({ titulo, valor, signo, destacado, className }: { titulo: string; valor: number; signo?: '+' | '−'; destacado?: boolean; className?: string }) {
   return (
-    <Tarjeta className={cx('px-3 py-2.5', destacado && 'border-marca-500')}>
+    <Tarjeta className={cx('px-3 py-2.5', destacado && 'border-marca-500', className)}>
       <p className="text-xs text-suave">{titulo}</p>
       <p className={cx('tabular text-lg font-semibold', destacado && 'texto-plata')}>
         {signo && <span className="text-suave">{signo} </span>}
