@@ -344,10 +344,10 @@ function EditarReposiciones({ linea, eventoId }: { linea: LineaBarraDB; eventoId
     setError('')
     const n = Number(cantidad)
     if (!Number.isInteger(n) || n <= 0) return setError('La cantidad tiene que ser un número entero mayor a 0.')
-    if (hayTotal && !confirm('Esta línea tiene un total directo cargado. Si agregás una reposición detallada, el total se borra. ¿Seguir?')) return
+    if (hayTotal && !confirm(`Ya hay un total cargado de una vez (${formatoCantidad(suma, u)}). Esta reposición se SUMA a ese total. ¿Seguir?`)) return
     try {
       await cambio.mutateAsync(async (sb) => {
-        if (hayTotal) await ejecutar(sb.from('reposiciones').delete().eq('barra_articulo_id', linea.id).eq('tipo', 'total'))
+        // Nunca se borra nada: cada reposición queda guardada con su hora
         await ejecutar(
           sb.from('reposiciones').insert({
             barra_articulo_id: linea.id,
@@ -372,11 +372,17 @@ function EditarReposiciones({ linea, eventoId }: { linea: LineaBarraDB; eventoId
     setError('')
     const n = Number(total)
     if (!Number.isInteger(n) || n < 0) return setError('El total tiene que ser un número entero, 0 o más.')
-    if (hayDetalle && !confirm(`El total directo reemplaza las ${linea.reposiciones.length} reposiciones detalladas. ¿Seguir?`)) return
+    // El total directo solo existe si NO se anotaron reposiciones detalladas (nunca las reemplaza)
+    if (hayDetalle) return setError('Ya hay reposiciones anotadas: el total se suma solo.')
+    const existente = linea.reposiciones.find((r) => r.tipo === 'total')
     try {
       await cambio.mutateAsync(async (sb) => {
-        await ejecutar(sb.from('reposiciones').delete().eq('barra_articulo_id', linea.id))
-        if (n > 0) {
+        if (existente && n > 0) {
+          // corregir el número del total cargado de una vez
+          await ejecutar(sb.from('reposiciones').update({ cantidad: n }).eq('id', existente.id).select('id').single())
+        } else if (existente && n === 0) {
+          await mandarAPapelera('reposicion', existente.id)
+        } else if (n > 0) {
           await ejecutar(
             sb.from('reposiciones').insert({
               barra_articulo_id: linea.id,
@@ -414,7 +420,7 @@ function EditarReposiciones({ linea, eventoId }: { linea: LineaBarraDB; eventoId
           <p className="text-xs text-suave">Cada reposición sale del depósito.</p>
         </div>
         <div className="text-right">
-          <p className="text-xs text-suave">Total</p>
+          <p className="text-xs text-suave">{hayDetalle ? `Total (${linea.reposiciones.length} ${linea.reposiciones.length === 1 ? 'reposición' : 'reposiciones'})` : 'Total'}</p>
           <p className="tabular text-xl font-bold">{formatoCantidad(suma, u)}</p>
         </div>
       </div>
@@ -425,7 +431,7 @@ function EditarReposiciones({ linea, eventoId }: { linea: LineaBarraDB; eventoId
             <li key={r.id} className="flex items-center justify-between px-3 py-2 text-sm">
               <div>
                 <p className="font-medium">
-                  {r.tipo === 'total' ? 'Total directo' : formatoHora(r.hora)} · <span className="tabular">{formatoCantidad(r.cantidad, u)}</span>
+                  {r.tipo === 'total' ? 'Total cargado de una vez' : formatoHora(r.hora)} · <span className="tabular">{formatoCantidad(r.cantidad, u)}</span>
                 </p>
                 <p className="text-xs text-suave">cargó {r.autor?.nombre ?? 'usuario'}</p>
               </div>
@@ -449,27 +455,33 @@ function EditarReposiciones({ linea, eventoId }: { linea: LineaBarraDB; eventoId
         </Boton>
       </form>
 
-      <form onSubmit={cargarTotal} className="space-y-3 rounded-xl border border-dashed border-borde p-3">
-        <p className="text-sm font-semibold">O cargar el total directo</p>
-        <p className="text-xs text-suave">Si no se anotó cada reposición, cargá el número total de una. Reemplaza lo de arriba.</p>
-        <div className="flex gap-2">
-          <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            step={1}
-            value={total}
-            onChange={(e) => setTotal(e.target.value)}
-            placeholder={String(suma)}
-            className="min-h-11 w-full flex-1 rounded-lg border border-borde bg-superficie px-3 outline-none focus:border-marca-500"
-          />
-          <Boton type="submit" variante="secundario" cargando={cambio.isPending}>
-            Cargar total
-          </Boton>
-        </div>
-        {total !== '' && <AvisoStock articuloId={linea.articulo_id} anterior={suma} nuevo={Number(total)} unidad={u} />}
-        {nuevoFinalInvalido && <Aviso>Ojo: el stock final cargado quedaría mayor a lo llevado.</Aviso>}
-      </form>
+      {hayDetalle ? (
+        <p className="rounded-lg bg-realce px-3 py-2 text-xs text-suave">
+          El total se suma solo con las reposiciones anotadas. No hace falta cargar ningún número al final, y el detalle con los horarios queda guardado.
+        </p>
+      ) : (
+        <form onSubmit={cargarTotal} className="space-y-3 rounded-xl border border-dashed border-borde p-3">
+          <p className="text-sm font-semibold">{hayTotal ? 'Corregir el total cargado de una vez' : 'O cargar el total de una vez'}</p>
+          <p className="text-xs text-suave">Solo si durante la noche no se anotó cada reposición. Si se anotaron, el total se suma solo.</p>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              value={total}
+              onChange={(e) => setTotal(e.target.value)}
+              placeholder={String(suma)}
+              className="min-h-11 w-full flex-1 rounded-lg border border-borde bg-superficie px-3 outline-none focus:border-marca-500"
+            />
+            <Boton type="submit" variante="secundario" cargando={cambio.isPending}>
+              {hayTotal ? 'Corregir' : 'Cargar total'}
+            </Boton>
+          </div>
+          {total !== '' && <AvisoStock articuloId={linea.articulo_id} anterior={suma} nuevo={Number(total)} unidad={u} />}
+          {nuevoFinalInvalido && <Aviso>Ojo: el stock final cargado quedaría mayor a lo llevado.</Aviso>}
+        </form>
+      )}
       {error && <Aviso>{error}</Aviso>}
     </div>
   )
