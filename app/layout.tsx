@@ -1,10 +1,13 @@
 import type { Metadata, Viewport } from 'next'
+import { RegistrarServiceWorker } from '@/components/AppInstalable'
 import { Proveedores } from '@/lib/sesion'
 import './globals.css'
 
 export const metadata: Metadata = {
   title: 'HUB · Stock de Bebidas',
   description: 'Control del depósito y de las barras de cada evento',
+  applicationName: 'HUB Stock',
+  appleWebApp: { capable: true, title: 'HUB Stock', statusBarStyle: 'black' },
 }
 
 export const viewport: Viewport = {
@@ -17,6 +20,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html lang="es-AR" className="h-full antialiased">
       <body className="min-h-full">
+        <RegistrarServiceWorker />
         <Proveedores>{children}</Proveedores>
       </body>
     </html>

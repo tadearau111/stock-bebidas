@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, type ReactNode } from 'react'
+import { EstadoConexion, Sincronizador } from '@/components/Conexion'
 import { IconoMas, Marca } from '@/components/marca'
 import { secciones } from '@/components/navegacion'
 import { Boton, Cargando, cx } from '@/components/ui'
@@ -84,6 +85,8 @@ export default function LayoutApp({ children }: { children: ReactNode }) {
           </div>
         )}
 
+        <EstadoConexion />
+        <Sincronizador />
         <main className="mx-auto max-w-6xl px-4 pb-28 pt-4 md:px-8 md:pb-10 md:pt-8">{children}</main>
       </div>
 

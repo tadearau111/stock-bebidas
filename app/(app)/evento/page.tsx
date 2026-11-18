@@ -13,7 +13,9 @@ import { PestanaCajeros } from '@/components/eventos/PestanaCajeros'
 import { PestanaCostos } from '@/components/eventos/PestanaCostos'
 import { PestanaResumen } from '@/components/eventos/PestanaResumen'
 import { Aviso, Boton, Cargando, Ventana, cx } from '@/components/ui'
-import { ejecutar, useArchivarEvento, useBorrarEvento, useCambioEvento, useEvento } from '@/lib/eventos'
+import { useArchivarEvento, useBorrarEvento, useEvento } from '@/lib/eventos'
+import { insertar } from '@/lib/offline/cola'
+import { useCargaEvento } from '@/lib/offline/sincronizar'
 import { formatoFechaEvento, formatoNumero, mensajeError } from '@/lib/formato'
 import { useLocalId, useSesion } from '@/lib/sesion'
 
@@ -34,7 +36,7 @@ function Evento() {
   const { puede } = useSesion()
   const localId = useLocalId()
   const { data: detalle, isPending, error } = useEvento(id)
-  const cambio = useCambioEvento(id)
+  const carga = useCargaEvento(id)
   const borrar = useBorrarEvento()
   const archivar = useArchivarEvento()
   const [editando, setEditando] = useState(false)
@@ -68,10 +70,9 @@ function Evento() {
     setErrorAccion('')
     const orden = Math.max(0, ...barras.map((b) => b.orden)) + 1
     try {
-      const nueva = (await cambio.mutateAsync((sb) =>
-        ejecutar(sb.from('barras').insert({ evento_id: id, local_id: localId, nombre: `Barra ${barras.length + 1}`, orden }).select('id').single()),
-      )) as { id: string }
-      irA(nueva.id)
+      const op = insertar('barras', { evento_id: id, local_id: localId, nombre: `Barra ${barras.length + 1}`, orden })
+      await carga.guardar(`Nueva barra: Barra ${barras.length + 1}`, [op])
+      irA(String(op.filas[0].id))
     } catch (e) {
       setErrorAccion(mensajeError(e))
     }
@@ -162,7 +163,7 @@ function Evento() {
               {p.id === 'abierta' && (
                 <button
                   onClick={agregarBarra}
-                  disabled={cambio.isPending}
+                  disabled={carga.guardando}
                   className="mr-2 shrink-0 whitespace-nowrap rounded-lg border border-dashed border-borde px-3 py-2 text-sm text-suave hover:border-marca-500 hover:text-tinta"
                 >
                   +1 Barra

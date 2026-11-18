@@ -3,9 +3,9 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Aviso, Boton, Campo, Tarjeta, cx } from '@/components/ui'
 import { CAJA_VACIA, calcularCaja, textoDiferencia, type DatosCaja } from '@/lib/calculos/caja'
-import { ejecutar, useCambioEvento } from '@/lib/eventos'
-import { ahoraParaInput, formatoFechaHora, formatoHora, formatoPesos, leerPrecio, mensajeError } from '@/lib/formato'
-import { mandarAPapelera } from '@/lib/papelera'
+import { formatoFechaHora, formatoHora, formatoPesos, leerPrecio, mensajeError } from '@/lib/formato'
+import { aPapelera, guardarCaja, insertar } from '@/lib/offline/cola'
+import { useCargaEvento } from '@/lib/offline/sincronizar'
 import { useLocalId } from '@/lib/sesion'
 import type { DetalleEvento, GastoDB } from '@/lib/tipos'
 
@@ -19,7 +19,7 @@ const aTexto = (v: number | null) => (v == null ? '' : miles.format(v))
 export function PestanaCaja({ detalle }: { detalle: DetalleEvento }) {
   const eventoId = detalle.evento.id
   const localId = useLocalId()
-  const cambio = useCambioEvento(eventoId)
+  const carga = useCargaEvento(eventoId)
   const guardada = detalle.caja ?? null
   const inicial = useMemo(() => {
     const base = guardada ?? CAJA_VACIA
@@ -56,10 +56,8 @@ export function PestanaCaja({ detalle }: { detalle: DetalleEvento }) {
     if (invalidos.length) return setError('Hay montos que no son válidos. Usá solo números (ej: 125.000 o 125000,50).')
     if (valores.vasos_no_devueltos != null && !Number.isInteger(valores.vasos_no_devueltos)) return setError('Los vasos no devueltos tienen que ser un número entero.')
     try {
-      await cambio.mutateAsync((sb) =>
-        ejecutar(sb.from('evento_caja').upsert({ evento_id: eventoId, local_id: localId, ...valores }, { onConflict: 'evento_id' }).select('evento_id').single()),
-      )
-      setOk('Caja guardada.')
+      const { sinConexion } = await carga.guardar('Caja del evento', [guardarCaja({ evento_id: eventoId, local_id: localId, ...valores })])
+      setOk(sinConexion ? 'Caja guardada en este celular (se manda sola cuando vuelva internet).' : 'Caja guardada.')
       setTimeout(() => setOk(''), 4000)
     } catch (err) {
       setError(mensajeError(err))
@@ -148,8 +146,8 @@ export function PestanaCaja({ detalle }: { detalle: DetalleEvento }) {
       {ok && <Aviso tipo="ok">✓ {ok}</Aviso>}
 
       {/* Botón fijo para guardar mientras se carga */}
-      <div className={cx('sticky bottom-20 z-[5] md:bottom-4', !hayCambios && !cambio.isPending && 'pointer-events-none opacity-0')}>
-        <Boton type="submit" className="w-full shadow-2xl shadow-black" cargando={cambio.isPending}>
+      <div className={cx('sticky bottom-20 z-[5] md:bottom-4', !hayCambios && !carga.guardando && 'pointer-events-none opacity-0')}>
+        <Boton type="submit" className="w-full shadow-2xl shadow-black" cargando={carga.guardando}>
           Guardar caja
         </Boton>
       </div>
@@ -161,7 +159,7 @@ export function PestanaCaja({ detalle }: { detalle: DetalleEvento }) {
 
 function Gastos({ gastos, eventoId, total }: { gastos: GastoDB[]; eventoId: string; total: number }) {
   const localId = useLocalId()
-  const cambio = useCambioEvento(eventoId)
+  const carga = useCargaEvento(eventoId)
   const [monto, setMonto] = useState('')
   const [detalle, setDetalle] = useState('')
   const [error, setError] = useState('')
@@ -172,9 +170,9 @@ function Gastos({ gastos, eventoId, total }: { gastos: GastoDB[]; eventoId: stri
     if (m == null || Number.isNaN(m) || m <= 0) return setError('Poné un monto mayor a 0.')
     if (!detalle.trim()) return setError('Anotá a qué fue el gasto.')
     try {
-      await cambio.mutateAsync((sb) =>
-        ejecutar(sb.from('evento_gastos').insert({ evento_id: eventoId, local_id: localId, monto: m, detalle: detalle.trim(), hora: new Date(ahoraParaInput()).toISOString() })),
-      )
+      await carga.guardar(`Gasto de la noche: ${detalle.trim()} ${formatoPesos(m)}`, [
+        insertar('evento_gastos', { evento_id: eventoId, local_id: localId, monto: m, detalle: detalle.trim() }),
+      ])
       setMonto('')
       setDetalle('')
     } catch (e) {
@@ -185,7 +183,7 @@ function Gastos({ gastos, eventoId, total }: { gastos: GastoDB[]; eventoId: stri
   async function borrar(g: GastoDB) {
     if (!confirm(`¿Borrar el gasto "${g.detalle}" de ${formatoPesos(g.monto)}? Va a la papelera durante 30 días.`)) return
     try {
-      await cambio.mutateAsync(() => mandarAPapelera('gasto', g.id))
+      await carga.guardar(`Borrar el gasto "${g.detalle}"`, [aPapelera('gasto', g.id)])
     } catch (e) {
       setError(mensajeError(e))
     }
@@ -232,7 +230,7 @@ function Gastos({ gastos, eventoId, total }: { gastos: GastoDB[]; eventoId: stri
           }}
         />
       </div>
-      <Boton variante="secundario" className="w-full" onClick={agregar} cargando={cambio.isPending}>
+      <Boton variante="secundario" className="w-full" onClick={agregar} cargando={carga.guardando}>
         + Agregar gasto
       </Boton>
       {error && <Aviso>{error}</Aviso>}

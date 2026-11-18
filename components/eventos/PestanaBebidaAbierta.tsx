@@ -5,9 +5,9 @@ import { Aviso, Tarjeta, cx } from '@/components/ui'
 import { bebidaAbiertaPorArticulo, etiquetaCuartos, formatoBotellas, sumarFracciones } from '@/lib/calculos/evento'
 import { coincideBusqueda } from '@/lib/calculos/stock'
 import { useArticulos } from '@/lib/datos'
-import { ejecutar, useCambioEvento } from '@/lib/eventos'
 import { formatoHora, mensajeError } from '@/lib/formato'
-import { mandarAPapelera } from '@/lib/papelera'
+import { aPapelera, insertar } from '@/lib/offline/cola'
+import { useCargaEvento } from '@/lib/offline/sincronizar'
 import { useLocalId } from '@/lib/sesion'
 import type { DetalleEvento } from '@/lib/tipos'
 
@@ -16,7 +16,7 @@ const FRACCIONES = [1, 2, 3, 4] as const
 export function PestanaBebidaAbierta({ detalle }: { detalle: DetalleEvento }) {
   const localId = useLocalId()
   const eventoId = detalle.evento.id
-  const cambio = useCambioEvento(eventoId)
+  const carga = useCargaEvento(eventoId)
   const { data: articulos } = useArticulos()
   const [articuloId, setArticuloId] = useState('')
   const [busqueda, setBusqueda] = useState('')
@@ -41,9 +41,9 @@ export function PestanaBebidaAbierta({ detalle }: { detalle: DetalleEvento }) {
     setError('')
     if (!articuloId) return setError('Primero elegí el artículo.')
     try {
-      await cambio.mutateAsync((sb) =>
-        ejecutar(sb.from('bebida_abierta').insert({ evento_id: eventoId, local_id: localId, articulo_id: articuloId, cuartos })),
-      )
+      await carga.guardar(`Bebida abierta: ${etiquetaCuartos(cuartos)} de ${nombre(articuloId)}`, [
+        insertar('bebida_abierta', { evento_id: eventoId, local_id: localId, articulo_id: articuloId, cuartos }, { articulo: { nombre: nombre(articuloId) } }),
+      ])
       setUltimo(`${etiquetaCuartos(cuartos)} de ${nombre(articuloId)} cargado.`)
       setTimeout(() => setUltimo(''), 3000)
     } catch (e) {
@@ -54,7 +54,7 @@ export function PestanaBebidaAbierta({ detalle }: { detalle: DetalleEvento }) {
   async function borrar(id: string) {
     if (!confirm('¿Borrar esta carga? Va a la papelera durante 30 días.')) return
     try {
-      await cambio.mutateAsync(() => mandarAPapelera('bebida_abierta', id))
+      await carga.guardar('Borrar una carga de bebida abierta', [aPapelera('bebida_abierta', id)])
     } catch (e) {
       setError(mensajeError(e))
     }
@@ -102,7 +102,7 @@ export function PestanaBebidaAbierta({ detalle }: { detalle: DetalleEvento }) {
           {FRACCIONES.map((c) => (
             <button
               key={c}
-              disabled={!articuloId || cambio.isPending}
+              disabled={!articuloId || carga.guardando}
               onClick={() => cargar(c)}
               className={cx(
                 'flex h-16 flex-col items-center justify-center rounded-xl border text-2xl font-semibold transition-colors',

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
+import { useEffect, useId, useRef, useSyncExternalStore, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ')
 
@@ -159,7 +159,27 @@ export function Tarjeta({ className, children }: { className?: string; children:
   return <div className={cx('rounded-xl border border-borde bg-superficie', className)}>{children}</div>
 }
 
+function suscribirConexion(f: () => void) {
+  window.addEventListener('online', f)
+  window.addEventListener('offline', f)
+  return () => {
+    window.removeEventListener('online', f)
+    window.removeEventListener('offline', f)
+  }
+}
+
 export function Cargando({ texto = 'Cargando…' }: { texto?: string }) {
+  const enLinea = useSyncExternalStore(
+    suscribirConexion,
+    () => navigator.onLine,
+    () => true,
+  )
+  if (!enLinea)
+    return (
+      <p className="px-4 py-10 text-center text-suave">
+        Sin conexión. Esta pantalla todavía no quedó guardada en este dispositivo: abrila una vez con internet para poder verla sin conexión.
+      </p>
+    )
   return <p className="py-10 text-center text-suave">{texto}</p>
 }
 

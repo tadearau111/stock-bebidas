@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import { InstalarApp } from '@/components/AppInstalable'
 import { FormIngreso } from '@/components/deposito/formularios'
 import { FormEvento } from '@/components/eventos/FormEvento'
 import { BotonesExportar } from '@/components/Exportar'
@@ -30,6 +31,8 @@ export default function PaginaInicio() {
       </div>
 
       {mensaje && <Aviso tipo="ok">✓ {mensaje}</Aviso>}
+
+      <InstalarApp ocultable />
 
       {/* Accesos rápidos */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

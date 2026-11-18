@@ -62,3 +62,19 @@ Listo: abrí el link desde el celular o la computadora e ingresá con tu email y
 - **Supabase gratis "pausa" el proyecto si nadie lo usa durante 7 días.** No se pierde nada: entrás a supabase.com y tocás **Restore project**.
 - Cada vez que se guarda una versión nueva del código en GitHub, **Vercel actualiza la página sola**.
 - Nunca compartas la **Database Password** ni la clave **secret / service_role**. Las dos claves de la tabla del paso 2 sí se pueden compartir.
+
+## Instalar la app y usarla sin internet
+
+**Instalar (una vez por celular):**
+
+- **iPhone:** abrí la plataforma en **Safari** → botón **Compartir** (cuadrado con flecha) → **“Agregar a inicio”** → **Agregar**.
+- **Android:** abrila en **Chrome** → los **tres puntitos** → **“Instalar app”** (o “Agregar a la pantalla principal”). También aparece el botón **Instalar** en Inicio y en “Más”.
+- **Computadora:** en Chrome o Edge, el ícono de instalar a la derecha de la barra de direcciones.
+
+**Sin internet:**
+
+- Abrí la app **al menos una vez con internet** en ese celular (y con tu usuario). Los eventos de estos días (de 3 días atrás a 2 semanas adelante) quedan guardados solos.
+- Sin conexión aparece una franja amarilla arriba. Todo lo que se carga **en un evento** (barras, stock inicial y final, reposiciones, retiros, bebida abierta, gastos, caja, cajeros) se guarda en el celular y **se manda solo** cuando vuelve internet, con la hora en que se cargó.
+- Lo que no es de un evento (depósito, caja fuerte, usuarios…) necesita internet.
+- **No cierres sesión** mientras haya cambios esperando: si lo hacés, quedan en el celular y se mandan la próxima vez que entres con tu usuario.
+- Si al mandarse la base rechaza algún cambio (por ejemplo, alguien borró ese dato mientras tanto), la franja lo avisa en rojo: tocá **Ver** para revisarlo.

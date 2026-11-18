@@ -4,9 +4,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useId, useState } from 'react'
 import { Aviso, Boton, Campo, Tarjeta } from '@/components/ui'
 import { resumirCajeros, type ResumenCajero } from '@/lib/calculos/cajeros'
-import { ejecutar, useCambioEvento } from '@/lib/eventos'
 import { formatoHora, formatoPesos, leerPrecio, mensajeError } from '@/lib/formato'
-import { mandarAPapelera } from '@/lib/papelera'
+import { actualizar, aPapelera, insertar } from '@/lib/offline/cola'
+import { useCargaEvento } from '@/lib/offline/sincronizar'
 import { supabase } from '@/lib/supabase/cliente'
 import { useLocalId } from '@/lib/sesion'
 import type { DetalleEvento } from '@/lib/tipos'
@@ -48,7 +48,7 @@ function horaAFecha(hhmm: string): Date {
 export function PestanaCajeros({ detalle }: { detalle: DetalleEvento }) {
   const eventoId = detalle.evento.id
   const localId = useLocalId()
-  const cambio = useCambioEvento(eventoId)
+  const carga = useCargaEvento(eventoId)
   const { data: sugeridos } = useNombresCajeros()
   const listaId = useId()
   const [nombre, setNombre] = useState('')
@@ -63,7 +63,7 @@ export function PestanaCajeros({ detalle }: { detalle: DetalleEvento }) {
     if (yaEstan.has(n.toLocaleLowerCase('es'))) return setError('Ese cajero ya está en la lista.')
     const orden = Math.max(0, ...detalle.cajeros.map((c) => c.orden)) + 1
     try {
-      await cambio.mutateAsync((sb) => ejecutar(sb.from('evento_cajeros').insert({ evento_id: eventoId, local_id: localId, nombre: n, orden }).select('id').single()))
+      await carga.guardar(`Cajero: ${n}`, [insertar('evento_cajeros', { evento_id: eventoId, local_id: localId, nombre: n, orden })])
       setNombre('')
     } catch (e) {
       setError(mensajeError(e))
@@ -123,7 +123,7 @@ export function PestanaCajeros({ detalle }: { detalle: DetalleEvento }) {
               }
             }}
           />
-          <Boton onClick={agregarCajero} cargando={cambio.isPending} textoCargando="…">
+          <Boton onClick={agregarCajero} cargando={carga.guardando} textoCargando="…">
             + Agregar
           </Boton>
         </div>
@@ -141,7 +141,7 @@ export function PestanaCajeros({ detalle }: { detalle: DetalleEvento }) {
 }
 
 function TarjetaCajero({ c, eventoId }: { c: ResumenCajero; eventoId: string }) {
-  const cambio = useCambioEvento(eventoId)
+  const carga = useCargaEvento(eventoId)
   const [monto, setMonto] = useState('')
   const [hora, setHora] = useState(horaAhora)
   const [notas, setNotas] = useState('')
@@ -153,15 +153,9 @@ function TarjetaCajero({ c, eventoId }: { c: ResumenCajero; eventoId: string }) 
     if (m == null || Number.isNaN(m) || m <= 0) return setError('Poné un monto mayor a 0.')
     if (!/^\d{2}:\d{2}$/.test(hora)) return setError('Elegí la hora del retiro.')
     try {
-      await cambio.mutateAsync((sb) =>
-        ejecutar(
-          sb
-            .from('cajero_retiros')
-            .insert({ cajero_id: c.cajero.id, evento_id: eventoId, monto: m, hora: horaAFecha(hora).toISOString(), notas: notas.trim() || null })
-            .select('id')
-            .single(),
-        ),
-      )
+      await carga.guardar(`Retiro a ${c.cajero.nombre}: ${formatoPesos(m)}`, [
+        insertar('cajero_retiros', { cajero_id: c.cajero.id, evento_id: eventoId, monto: m, hora: horaAFecha(hora).toISOString(), notas: notas.trim() || null }),
+      ])
       setMonto('')
       setNotas('')
       setHora(horaAhora())
@@ -174,7 +168,7 @@ function TarjetaCajero({ c, eventoId }: { c: ResumenCajero; eventoId: string }) 
     const nuevo = prompt('Nombre del cajero:', c.cajero.nombre)?.trim()
     if (!nuevo || nuevo === c.cajero.nombre) return
     try {
-      await cambio.mutateAsync((sb) => ejecutar(sb.from('evento_cajeros').update({ nombre: nuevo }).eq('id', c.cajero.id).select('id').single()))
+      await carga.guardar(`Cambiar nombre del cajero a ${nuevo}`, [actualizar('evento_cajeros', c.cajero.id, { nombre: nuevo })])
     } catch (e) {
       setError(mensajeError(e))
     }
@@ -186,7 +180,7 @@ function TarjetaCajero({ c, eventoId }: { c: ResumenCajero; eventoId: string }) 
       : `¿Borrar a ${c.cajero.nombre}? Va a la papelera durante 30 días.`
     if (!confirm(aviso)) return
     try {
-      await cambio.mutateAsync(() => mandarAPapelera('cajero', c.cajero.id))
+      await carga.guardar(`Borrar al cajero ${c.cajero.nombre}`, [aPapelera('cajero', c.cajero.id)])
     } catch (e) {
       setError(mensajeError(e))
     }
@@ -195,7 +189,7 @@ function TarjetaCajero({ c, eventoId }: { c: ResumenCajero; eventoId: string }) 
   async function borrarRetiro(id: string, montoRetiro: number) {
     if (!confirm(`¿Borrar el retiro de ${formatoPesos(montoRetiro)}? Va a la papelera durante 30 días.`)) return
     try {
-      await cambio.mutateAsync(() => mandarAPapelera('retiro_cajero', id))
+      await carga.guardar(`Borrar un retiro de ${c.cajero.nombre}`, [aPapelera('retiro_cajero', id)])
     } catch (e) {
       setError(mensajeError(e))
     }
@@ -255,7 +249,7 @@ function TarjetaCajero({ c, eventoId }: { c: ResumenCajero; eventoId: string }) 
         <Campo etiqueta="Hora" type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
       </div>
       <Campo etiqueta="Notas (opcional)" placeholder="Ej: retiró Laura" value={notas} onChange={(e) => setNotas(e.target.value)} />
-      <Boton variante="secundario" className="w-full" onClick={registrar} cargando={cambio.isPending}>
+      <Boton variante="secundario" className="w-full" onClick={registrar} cargando={carga.guardando}>
         + Registrar retiro
       </Boton>
       {error && <Aviso>{error}</Aviso>}

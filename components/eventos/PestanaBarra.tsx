@@ -5,8 +5,9 @@ import { Aviso, Boton, Campo, Etiqueta, Tarjeta, Ventana, cx } from '@/component
 import { consumido, faltaEnDeposito, stockFinalValido, totalLlevado, totalReposiciones } from '@/lib/calculos/evento'
 import { coincideBusqueda } from '@/lib/calculos/stock'
 import { useArticulos } from '@/lib/datos'
-import { ejecutar, useCambioEvento, useStockLocal } from '@/lib/eventos'
-import { mandarAPapelera } from '@/lib/papelera'
+import { useStockLocal } from '@/lib/eventos'
+import { actualizar, aPapelera, insertar } from '@/lib/offline/cola'
+import { useCargaEvento } from '@/lib/offline/sincronizar'
 import { useGuardarTrago, useTragos } from '@/lib/tragos'
 import { ahoraParaInput, detalleArticulo, formatoCantidad, formatoHora, formatoNumero, formatoVasos, mensajeError } from '@/lib/formato'
 import { useLocalId, useSesion } from '@/lib/sesion'
@@ -30,7 +31,7 @@ export function PestanaBarra({
   alBorrar: () => void
 }) {
   const { puede } = useSesion()
-  const cambio = useCambioEvento(detalle.evento.id)
+  const carga = useCargaEvento(detalle.evento.id)
   const [edicion, setEdicion] = useState<Edicion>(null)
   const [error, setError] = useState('')
   const lineas = detalle.lineas.filter((l) => l.barra_id === barra.id)
@@ -43,7 +44,7 @@ export function PestanaBarra({
       : `¿Borrar "${barra.nombre}"? Va a la papelera durante 30 días.`
     if (!confirm(texto)) return
     try {
-      await cambio.mutateAsync(() => mandarAPapelera('barra', barra.id))
+      await carga.guardar(`Borrar ${barra.nombre}`, [aPapelera('barra', barra.id)])
       alBorrar()
     } catch (e) {
       setError(mensajeError(e))
@@ -54,7 +55,7 @@ export function PestanaBarra({
     const cargado = l.stock_inicial > 0 || l.reposiciones.length > 0 || l.stock_final != null
     if (cargado && !confirm(`¿Quitar ${l.articulo.nombre} de esta barra? Lo cargado vuelve al depósito. Va a la papelera durante 30 días.`)) return
     try {
-      await cambio.mutateAsync(() => mandarAPapelera('linea', l.id))
+      await carga.guardar(`Quitar ${l.articulo.nombre} de ${barra.nombre}`, [aPapelera('linea', l.id)])
     } catch (e) {
       setError(mensajeError(e))
     }
@@ -244,7 +245,7 @@ function AvisoStock({ articuloId, anterior, nuevo, unidad }: { articuloId: strin
 // ------------------------------------------------------------------ Stock inicial / final
 
 function EditarStock({ tipo, linea, eventoId, alTerminar }: { tipo: 'inicial' | 'final'; linea: LineaBarraDB; eventoId: string; alTerminar: () => void }) {
-  const cambio = useCambioEvento(eventoId)
+  const carga = useCargaEvento(eventoId)
   const actual = tipo === 'inicial' ? linea.stock_inicial : linea.stock_final
   const [valor, setValor] = useState(actual == null ? '' : String(actual))
   const [error, setError] = useState('')
@@ -262,9 +263,9 @@ function EditarStock({ tipo, linea, eventoId, alTerminar }: { tipo: 'inicial' | 
       return setError('Con ese stock inicial, el stock final cargado quedaría mayor a lo llevado. Corregí primero el stock final.')
     }
     try {
-      await cambio.mutateAsync((sb) =>
-        ejecutar(sb.from('barra_articulos').update(tipo === 'inicial' ? { stock_inicial: n } : { stock_final: n }).eq('id', linea.id).select('id').single()),
-      )
+      await carga.guardar(`Stock ${tipo} de ${linea.articulo.nombre}: ${n}`, [
+        actualizar('barra_articulos', linea.id, tipo === 'inicial' ? { stock_inicial: n } : { stock_final: n }),
+      ])
       alTerminar()
     } catch (err) {
       setError(mensajeError(err))
@@ -273,7 +274,7 @@ function EditarStock({ tipo, linea, eventoId, alTerminar }: { tipo: 'inicial' | 
 
   async function borrarFinal() {
     try {
-      await cambio.mutateAsync((sb) => ejecutar(sb.from('barra_articulos').update({ stock_final: null }).eq('id', linea.id).select('id').single()))
+      await carga.guardar(`Borrar el stock final de ${linea.articulo.nombre}`, [actualizar('barra_articulos', linea.id, { stock_final: null })])
       alTerminar()
     } catch (err) {
       setError(mensajeError(err))
@@ -312,7 +313,7 @@ function EditarStock({ tipo, linea, eventoId, alTerminar }: { tipo: 'inicial' | 
         <Boton variante="secundario" className="flex-1" onClick={alTerminar}>
           Cancelar
         </Boton>
-        <Boton type="submit" className="flex-1" cargando={cambio.isPending}>
+        <Boton type="submit" className="flex-1" cargando={carga.guardando}>
           Guardar
         </Boton>
       </div>
@@ -329,7 +330,7 @@ function EditarStock({ tipo, linea, eventoId, alTerminar }: { tipo: 'inicial' | 
 
 function EditarReposiciones({ linea, eventoId }: { linea: LineaBarraDB; eventoId: string }) {
   const localId = useLocalId()
-  const cambio = useCambioEvento(eventoId)
+  const carga = useCargaEvento(eventoId)
   const [cantidad, setCantidad] = useState('')
   const [hora, setHora] = useState(ahoraParaInput())
   const [total, setTotal] = useState('')
@@ -346,20 +347,18 @@ function EditarReposiciones({ linea, eventoId }: { linea: LineaBarraDB; eventoId
     if (!Number.isInteger(n) || n <= 0) return setError('La cantidad tiene que ser un número entero mayor a 0.')
     if (hayTotal && !confirm(`Ya hay un total cargado de una vez (${formatoCantidad(suma, u)}). Esta reposición se SUMA a ese total. ¿Seguir?`)) return
     try {
-      await cambio.mutateAsync(async (sb) => {
-        // Nunca se borra nada: cada reposición queda guardada con su hora
-        await ejecutar(
-          sb.from('reposiciones').insert({
-            barra_articulo_id: linea.id,
-            evento_id: eventoId,
-            local_id: localId,
-            articulo_id: linea.articulo_id,
-            tipo: 'detalle',
-            cantidad: n,
-            hora: new Date(hora).toISOString(),
-          }),
-        )
-      })
+      // Nunca se borra nada: cada reposición queda guardada con su hora
+      await carga.guardar(`Reposición de ${n} ${linea.articulo.nombre}`, [
+        insertar('reposiciones', {
+          barra_articulo_id: linea.id,
+          evento_id: eventoId,
+          local_id: localId,
+          articulo_id: linea.articulo_id,
+          tipo: 'detalle',
+          cantidad: n,
+          hora: new Date(hora).toISOString(),
+        }),
+      ])
       setCantidad('')
       setHora(ahoraParaInput())
     } catch (err) {
@@ -376,25 +375,24 @@ function EditarReposiciones({ linea, eventoId }: { linea: LineaBarraDB; eventoId
     if (hayDetalle) return setError('Ya hay reposiciones anotadas: el total se suma solo.')
     const existente = linea.reposiciones.find((r) => r.tipo === 'total')
     try {
-      await cambio.mutateAsync(async (sb) => {
-        if (existente && n > 0) {
-          // corregir el número del total cargado de una vez
-          await ejecutar(sb.from('reposiciones').update({ cantidad: n }).eq('id', existente.id).select('id').single())
-        } else if (existente && n === 0) {
-          await mandarAPapelera('reposicion', existente.id)
-        } else if (n > 0) {
-          await ejecutar(
-            sb.from('reposiciones').insert({
-              barra_articulo_id: linea.id,
-              evento_id: eventoId,
-              local_id: localId,
-              articulo_id: linea.articulo_id,
-              tipo: 'total',
-              cantidad: n,
-            }),
-          )
-        }
-      })
+      const texto = `Total de reposiciones de ${linea.articulo.nombre}: ${n}`
+      if (existente && n > 0) {
+        // corregir el número del total cargado de una vez
+        await carga.guardar(texto, [actualizar('reposiciones', existente.id, { cantidad: n })])
+      } else if (existente && n === 0) {
+        await carga.guardar(texto, [aPapelera('reposicion', existente.id)])
+      } else if (n > 0) {
+        await carga.guardar(texto, [
+          insertar('reposiciones', {
+            barra_articulo_id: linea.id,
+            evento_id: eventoId,
+            local_id: localId,
+            articulo_id: linea.articulo_id,
+            tipo: 'total',
+            cantidad: n,
+          }),
+        ])
+      }
       setTotal('')
     } catch (err) {
       setError(mensajeError(err))
@@ -404,7 +402,7 @@ function EditarReposiciones({ linea, eventoId }: { linea: LineaBarraDB; eventoId
   async function borrar(id: string) {
     if (!confirm('¿Borrar esta reposición? Vuelve al depósito y va a la papelera durante 30 días.')) return
     try {
-      await cambio.mutateAsync(() => mandarAPapelera('reposicion', id))
+      await carga.guardar(`Borrar una reposición de ${linea.articulo.nombre}`, [aPapelera('reposicion', id)])
     } catch (err) {
       setError(mensajeError(err))
     }
@@ -450,7 +448,7 @@ function EditarReposiciones({ linea, eventoId }: { linea: LineaBarraDB; eventoId
           <Campo etiqueta="Hora" type="datetime-local" value={hora} onChange={(e) => setHora(e.target.value)} />
         </div>
         {cantidad !== '' && <AvisoStock articuloId={linea.articulo_id} anterior={0} nuevo={Number(cantidad)} unidad={u} />}
-        <Boton type="submit" className="w-full" cargando={cambio.isPending}>
+        <Boton type="submit" className="w-full" cargando={carga.guardando}>
           + Agregar
         </Boton>
       </form>
@@ -474,7 +472,7 @@ function EditarReposiciones({ linea, eventoId }: { linea: LineaBarraDB; eventoId
               placeholder={String(suma)}
               className="min-h-11 w-full flex-1 rounded-lg border border-borde bg-superficie px-3 outline-none focus:border-marca-500"
             />
-            <Boton type="submit" variante="secundario" cargando={cambio.isPending}>
+            <Boton type="submit" variante="secundario" cargando={carga.guardando}>
               {hayTotal ? 'Corregir' : 'Cargar total'}
             </Boton>
           </div>
@@ -493,7 +491,7 @@ function AgregarArticulos({ barra, eventoId, yaEstan, alTerminar }: { barra: Bar
   const localId = useLocalId()
   const { data: articulos } = useArticulos()
   const { data: stock } = useStockLocal()
-  const cambio = useCambioEvento(eventoId)
+  const carga = useCargaEvento(eventoId)
   const [busqueda, setBusqueda] = useState('')
   const [elegidos, setElegidos] = useState<Set<string>>(new Set())
   const [error, setError] = useState('')
@@ -518,13 +516,19 @@ function AgregarArticulos({ barra, eventoId, yaEstan, alTerminar }: { barra: Bar
     setError('')
     if (elegidos.size === 0) return setError('Elegí al menos un artículo.')
     try {
-      await cambio.mutateAsync((sb) =>
-        ejecutar(
-          sb.from('barra_articulos').insert(
-            [...elegidos].map((articulo_id) => ({ barra_id: barra.id, evento_id: eventoId, local_id: localId, articulo_id })),
-          ),
+      const ids = [...elegidos]
+      const art = (id: string) => articulos?.find((a) => a.id === id)
+      await carga.guardar(`Agregar ${ids.length} ${ids.length === 1 ? 'artículo' : 'artículos'} a ${barra.nombre}`, [
+        insertar(
+          'barra_articulos',
+          ids.map((articulo_id) => ({ barra_id: barra.id, evento_id: eventoId, local_id: localId, articulo_id })),
+          // Para mostrarlos enseguida aunque no haya conexión
+          ids.map((id) => {
+            const a = art(id)
+            return { articulo: { nombre: a?.nombre ?? 'Artículo', unidad: a?.unidad ?? 'unidad', marca: a?.marca ?? null, tamano: a?.tamano ?? null } }
+          }),
         ),
-      )
+      ])
       alTerminar()
     } catch (err) {
       setError(mensajeError(err))
@@ -570,7 +574,7 @@ function AgregarArticulos({ barra, eventoId, yaEstan, alTerminar }: { barra: Bar
         <Boton variante="secundario" className="flex-1" onClick={alTerminar}>
           Cancelar
         </Boton>
-        <Boton className="flex-1" onClick={guardar} cargando={cambio.isPending}>
+        <Boton className="flex-1" onClick={guardar} cargando={carga.guardando}>
           Agregar {elegidos.size > 0 ? elegidos.size : ''}
         </Boton>
       </div>
@@ -591,13 +595,13 @@ function SeccionRetiros({
   alAgregar: () => void
   hayArticulos: boolean
 }) {
-  const cambio = useCambioEvento(eventoId)
+  const carga = useCargaEvento(eventoId)
   const [error, setError] = useState('')
 
   async function borrar(r: RetiroDB) {
     if (!confirm(`¿Borrar el retiro de ${r.cantidad} ${r.articulo?.nombre ?? r.trago?.nombre ?? ''}? Va a la papelera durante 30 días.`)) return
     try {
-      await cambio.mutateAsync(() => mandarAPapelera('retiro', r.id))
+      await carga.guardar(`Borrar el retiro de ${r.cantidad} ${r.articulo?.nombre ?? r.trago?.nombre ?? ''}`, [aPapelera('retiro', r.id)])
     } catch (err) {
       setError(mensajeError(err))
     }
@@ -646,7 +650,7 @@ function SeccionRetiros({
 
 function FormRetiro({ barra, lineas, eventoId, alTerminar }: { barra: Barra; lineas: LineaBarraDB[]; eventoId: string; alTerminar: () => void }) {
   const localId = useLocalId()
-  const cambio = useCambioEvento(eventoId)
+  const carga = useCargaEvento(eventoId)
   const { puede } = useSesion()
   const { data: tragos } = useTragos()
   const guardarTrago = useGuardarTrago()
@@ -668,21 +672,27 @@ function FormRetiro({ barra, lineas, eventoId, alTerminar }: { barra: Barra; lin
     if (!Number.isInteger(n) || n <= 0) return setError('La cantidad tiene que ser un número entero mayor a 0.')
     if (!quien.trim()) return setError('Anotá quién lo retiró.')
     try {
-      await cambio.mutateAsync((sb) =>
-        ejecutar(
-          sb.from('retiros').insert({
+      const id = eleccion.slice(2)
+      const linea = lineas.find((l) => l.articulo_id === id)
+      const trago = tragos?.find((t) => t.id === id)
+      const que = esTrago ? (trago?.nombre ?? 'trago') : (linea?.articulo.nombre ?? 'artículo')
+      await carga.guardar(`${tipo === 'personal' ? 'Retiro de personal' : 'Cortesía'}: ${n} ${que}`, [
+        insertar(
+          'retiros',
+          {
             barra_id: barra.id,
             evento_id: eventoId,
             local_id: localId,
-            articulo_id: esTrago ? null : eleccion.slice(2),
-            trago_id: esTrago ? eleccion.slice(2) : null,
+            articulo_id: esTrago ? null : id,
+            trago_id: esTrago ? id : null,
             tipo,
             cantidad: n,
             retirado_por: quien.trim(),
             hora: new Date(hora).toISOString(),
-          }),
+          },
+          esTrago ? { trago: { nombre: que }, articulo: null } : { articulo: { nombre: que, unidad: linea?.articulo.unidad ?? 'unidad' }, trago: null },
         ),
-      )
+      ])
       alTerminar()
     } catch (err) {
       setError(mensajeError(err))
@@ -785,7 +795,7 @@ function FormRetiro({ barra, lineas, eventoId, alTerminar }: { barra: Barra; lin
         <Boton variante="secundario" className="flex-1" onClick={alTerminar}>
           Cancelar
         </Boton>
-        <Boton type="submit" className="flex-1" cargando={cambio.isPending}>
+        <Boton type="submit" className="flex-1" cargando={carga.guardando}>
           Guardar retiro
         </Boton>
       </div>
@@ -794,14 +804,14 @@ function FormRetiro({ barra, lineas, eventoId, alTerminar }: { barra: Barra; lin
 }
 
 function RenombrarBarra({ barra, eventoId, alTerminar }: { barra: Barra; eventoId: string; alTerminar: () => void }) {
-  const cambio = useCambioEvento(eventoId)
+  const carga = useCargaEvento(eventoId)
   const [nombre, setNombre] = useState(barra.nombre)
   const [error, setError] = useState('')
   async function guardar(e: FormEvent) {
     e.preventDefault()
     if (!nombre.trim()) return setError('Poné un nombre.')
     try {
-      await cambio.mutateAsync((sb) => ejecutar(sb.from('barras').update({ nombre: nombre.trim() }).eq('id', barra.id).select('id').single()))
+      await carga.guardar(`Renombrar ${barra.nombre} a ${nombre.trim()}`, [actualizar('barras', barra.id, { nombre: nombre.trim() })])
       alTerminar()
     } catch (err) {
       setError(mensajeError(err))
@@ -811,7 +821,7 @@ function RenombrarBarra({ barra, eventoId, alTerminar }: { barra: Barra; eventoI
     <form onSubmit={guardar} className="space-y-4">
       <Campo etiqueta="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus placeholder="Ej: Barra VIP" />
       {error && <Aviso>{error}</Aviso>}
-      <Boton type="submit" className="w-full" cargando={cambio.isPending}>
+      <Boton type="submit" className="w-full" cargando={carga.guardando}>
         Guardar
       </Boton>
     </form>

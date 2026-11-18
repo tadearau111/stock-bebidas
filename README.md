@@ -13,7 +13,7 @@ Plataforma web para manejar el stock de bebidas del depósito y el control de ca
 | 2 | Eventos, barras, reposiciones, stock final, retiros, bebida abierta, resumen | ✅ |
 | 3 | Usuarios, roles y permisos configurables, historial | ✅ |
 | 4 | Exportar a Excel y PDF, compartir por WhatsApp | ✅ |
-| 5 | App instalable y funcionamiento sin conexión | Pendiente |
+| 5 | App instalable y funcionamiento sin conexión | ✅ |
 
 ## Técnico
 
@@ -28,6 +28,13 @@ Plataforma web para manejar el stock de bebidas del depósito y el control de ca
 - El stock del depósito no se guarda como un número suelto: se calcula como ingresos + ajustes − lo consumido en las barras.
 - Los retiros ya están dentro del consumido. La bebida abierta es solo informativa: ninguno de los dos vuelve a descontar del depósito.
 - Los eventos nunca se bloquean, y todo cambio queda en el historial (`auditoria`).
+
+### Sin conexión (Fase 5)
+
+- `public/sw.js`: service worker propio. Guarda las pantallas y los archivos de la app; las pantallas van "internet primero, si no, lo guardado". Se registra con `?v=<commit>` para que cada publicación instale una versión nueva.
+- `lib/sesion.tsx`: lo último leído de la base queda en `localStorage` (TanStack Query persist), así se ve sin conexión. Si la sesión venció y no hay internet, se sigue con la guardada.
+- `lib/offline/`: lo que se carga en un evento se describe como operaciones simples (`insertar`, `actualizar`, `caja`, `papelera`). Con internet se mandan en el momento; sin internet quedan en una cola en el dispositivo y se mandan solas, en orden, al volver la conexión. Las altas llevan su `id` desde el dispositivo, así repetir un envío no duplica nada. Mientras esperan, se muestran como si ya estuvieran guardadas (`superponer.ts`).
+- Lo que no es de un evento (depósito, caja fuerte, usuarios…) necesita conexión: sin internet avisa "No hay conexión".
 
 ### Base de datos
 

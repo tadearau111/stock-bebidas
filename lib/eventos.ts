@@ -1,9 +1,12 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo } from 'react'
 import { supabase } from './supabase/cliente'
 import { mandarAPapelera } from './papelera'
-import { useLocalId } from './sesion'
+import { useLocalId, useSesion } from './sesion'
+import { limpiarEnviados, usePendientes } from './offline/sincronizar'
+import { superponerPendientes } from './offline/superponer'
 import type { TipoBarra } from './calculos/evento'
 import type { DetalleEvento, Evento } from './tipos'
 
@@ -31,8 +34,29 @@ export function useEventos() {
   })
 }
 
+/** Un evento con todo lo cargado, incluidos los cambios que esperan en el dispositivo (sin conexión). */
 export function useEvento(id: string) {
-  return useQuery({
+  const consulta = useEventoBase(id)
+  const pendientes = usePendientes()
+  const { nombre } = useSesion()
+  const { data, dataUpdatedAt, isFetching } = consulta
+
+  // Lo ya enviado deja de superponerse cuando los datos se vuelven a leer de la base
+  useEffect(() => {
+    if (dataUpdatedAt && !isFetching) limpiarEnviados(id, dataUpdatedAt)
+  }, [id, dataUpdatedAt, isFetching, pendientes])
+
+  const conPendientes = useMemo(() => (data ? superponerPendientes(data, pendientes, nombre) : data), [data, pendientes, nombre])
+  return { ...consulta, data: conPendientes }
+}
+
+function useEventoBase(id: string) {
+  return useQuery(opcionesEvento(id))
+}
+
+/** Consulta de un evento completo (también se usa para dejarlo guardado en el dispositivo antes de la noche). */
+export function opcionesEvento(id: string) {
+  return {
     queryKey: ['evento', id],
     enabled: !!id,
     queryFn: async (): Promise<DetalleEvento | null> => {
@@ -78,7 +102,7 @@ export function useEvento(id: string) {
         retirosCajeros: (lanzar(retirosCajeros) as DetalleEvento['retirosCajeros']).map((r) => ({ ...r, monto: Number(r.monto) })),
       }
     },
-  })
+  }
 }
 
 /** Stock del depósito por artículo (para avisar si no alcanza). */

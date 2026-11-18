@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { InstalarApp } from '@/components/AppInstalable'
 import { secciones } from '@/components/navegacion'
 import { Boton, Tarjeta } from '@/components/ui'
 import { useSesion } from '@/lib/sesion'
@@ -25,6 +26,7 @@ export default function PaginaMas() {
           ))}
         </Tarjeta>
       )}
+      <InstalarApp />
       <Tarjeta className="px-4 py-3">
         <p className="font-medium">{nombre}</p>
         <p className="text-sm text-suave">
