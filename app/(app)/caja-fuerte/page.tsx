@@ -1,19 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { BotonesExportar } from '@/components/Exportar'
 import { Aviso, Boton, Campo, Cargando, Tarjeta, Ventana, cx } from '@/components/ui'
-import {
-  armarLibro,
-  encadenarMeses,
-  mesActual,
-  nombreMes,
-  resumirPorMes,
-  type MovimientoManual,
-  type RenglonResumen,
-} from '@/lib/calculos/cajaFuerte'
-import { useBorrarMovimientoCajaFuerte, useCajaFuerte, useCierres, useGuardarCierre, useMovimientoCajaFuerte } from '@/lib/cajaFuerte'
+import { mesActual, nombreMes, type MovimientoManual, type RenglonResumen } from '@/lib/calculos/cajaFuerte'
+import { useBorrarMovimientoCajaFuerte, useCadenaCajaFuerte, useMovimientoCajaFuerte } from '@/lib/cajaFuerte'
 import { reporteCajaFuerteMes } from '@/lib/exportar/reportes'
 import { ahoraParaInput, formatoFechaEvento, formatoFechaHora, formatoPesos, leerPrecio, mensajeError } from '@/lib/formato'
 import { useSesion } from '@/lib/sesion'
@@ -23,32 +15,15 @@ type Edicion = { tipo: 'retiro' | 'ingreso'; mov?: MovimientoManual } | null
 export default function PaginaCajaFuerte() {
   const { puede, local } = useSesion()
   const permitido = puede('caja_fuerte.gestionar')
-  const { data, isPending, error } = useCajaFuerte(permitido)
-  const { data: cierres } = useCierres(permitido)
-  const guardarCierre = useGuardarCierre()
+  const { data, libro, cierres, cadena, guardarCierre, isPending, error } = useCadenaCajaFuerte(permitido)
   const [edicion, setEdicion] = useState<Edicion>(null)
   const [elegido, setElegido] = useState<string | null>(null)
   const [verActual, setVerActual] = useState(false)
   const [aviso, setAviso] = useState('')
-  const intentados = useRef(new Set<string>())
 
-  const libro = useMemo(() => (data ? armarLibro(data.eventos, data.manuales) : null), [data])
   const actual = mesActual()
-  // Cada mes arranca con el saldo con que cerró el anterior (manda lo guardado)
-  const cadena = useMemo(() => (libro && cierres ? encadenarMeses(resumirPorMes(libro), cierres) : null), [libro, cierres])
   const claves = cadena?.meses.map((m) => m.clave) ?? []
   const mesDe = (clave: string) => cadena?.meses.find((m) => m.clave === clave)
-
-  // Cuando un mes terminó y todavía no tiene su resumen guardado, se guarda solo
-  useEffect(() => {
-    if (!cadena) return
-    for (const m of cadena.meses) {
-      if (m.clave >= actual || m.guardado || intentados.current.has(m.clave)) continue
-      intentados.current.add(m.clave)
-      guardarCierre.mutate({ resumen: m.vivo })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cadena, actual])
 
   if (!permitido) return <Aviso>No tenés permiso para ver la caja fuerte.</Aviso>
 

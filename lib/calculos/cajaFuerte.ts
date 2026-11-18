@@ -102,6 +102,10 @@ export interface RenglonResumen {
   items?: { detalle: string; monto: number }[]
   /** En retiros/ingresos/pagos: id del movimiento (para editarlo) */
   ref?: string
+  /** En los pagos de tareas: a quién, qué tareas y cuántas horas (quedan guardados en el cierre del mes) */
+  persona?: string
+  tareas?: string
+  horas?: number | null
 }
 
 export interface ResumenMes {
@@ -145,6 +149,7 @@ export function aRenglonResumen(r: Renglon): RenglonResumen {
     saldo: r.saldo,
     evento_id: null,
     ref: r.mov.id,
+    ...(r.clase === 'pago' ? { persona: r.mov.persona ?? '', tareas: r.mov.detalle, horas: r.mov.horas ?? null } : {}),
   }
 }
 
@@ -200,6 +205,7 @@ export const nombreMes = (mes: number) => NOMBRES_MES[mes - 1]
 
 export interface CierreGuardado extends Omit<ResumenMes, 'clave'> {
   id?: string
+  cerrado_en?: string
 }
 
 export interface MesEncadenado {

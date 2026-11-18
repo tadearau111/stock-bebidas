@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { armarLibro, resumirPorMes } from './cajaFuerte'
-import { moverSemanas, nombresUsados, resumirSemana } from './tareas'
+import { moverSemanas, nombresUsados, resumirMesTareas, resumirSemana } from './tareas'
 
 const pago = (id: string, fecha: string, persona: string, monto: number, horas: number | null = null) => ({
   id,
@@ -54,5 +54,29 @@ describe('Tareas de la semana', () => {
     const [nov] = resumirPorMes(libro, new Date(2026, 10, 18))
     expect(nov.pagos).toBe(144_000)
     expect(nov.renglones.find((r) => r.ref === 'p1')).toMatchObject({ clase: 'pago', titulo: 'Pago de tareas', detalle: 'Juan Pérez: Limpieza (4 h)', monto: -20_000 })
+  })
+})
+
+describe('Tareas: resumen mensual', () => {
+  it('se arma con los renglones del mes (los mismos que quedan guardados en el cierre)', () => {
+    const libro = armarLibro([], movs)
+    const [nov] = resumirPorMes(libro, new Date(2026, 10, 18))
+    const r = resumirMesTareas(nov.renglones)
+    expect(r.total).toBe(144_000)
+    expect(r.horas).toBe(9.5)
+    expect(r.pagos[0]).toMatchObject({ persona: 'Juan Pérez', tareas: 'Limpieza', horas: 4, monto: 20_000 })
+    expect(r.porPersona.map((p) => [p.persona, p.total])).toEqual([
+      ['Juan Pérez', 129_000],
+      ['Ana', 15_000],
+    ])
+    expect(r.porSemana.map((s) => [s.desde, s.total])).toEqual([
+      ['2026-11-16', 45_000],
+      ['2026-11-23', 99_000],
+    ])
+  })
+  it('los datos del pago viajan en el renglón guardado (JSON)', () => {
+    const [nov] = resumirPorMes(armarLibro([], movs), new Date(2026, 10, 18))
+    const guardado = JSON.parse(JSON.stringify(nov.renglones))
+    expect(resumirMesTareas(guardado).total).toBe(144_000)
   })
 })

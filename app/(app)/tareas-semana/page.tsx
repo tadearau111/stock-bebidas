@@ -5,11 +5,11 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useId, useMemo, useState, type FormEvent } from 'react'
 import { BotonesExportar } from '@/components/Exportar'
 import { Aviso, Boton, Campo, Cargando, Tarjeta, Ventana, cx } from '@/components/ui'
-import { armarLibro, encadenarMeses, resumirPorMes, textoHoras, type MovimientoManual } from '@/lib/calculos/cajaFuerte'
-import { moverSemanas, nombresUsados, resumirSemana } from '@/lib/calculos/tareas'
-import { useBorrarMovimientoCajaFuerte, useCajaFuerte, useCierres, useMovimientoCajaFuerte } from '@/lib/cajaFuerte'
-import { reporteTareasSemana } from '@/lib/exportar/reportes'
-import { formatoFechaEvento, formatoPesos, hoyISO, leerPrecio, mensajeError } from '@/lib/formato'
+import { mesActual, nombreMes, textoHoras, type MesEncadenado, type MovimientoManual } from '@/lib/calculos/cajaFuerte'
+import { moverSemanas, nombresUsados, resumirMesTareas, resumirSemana } from '@/lib/calculos/tareas'
+import { useBorrarMovimientoCajaFuerte, useCadenaCajaFuerte, useMovimientoCajaFuerte } from '@/lib/cajaFuerte'
+import { reporteTareasMes, reporteTareasSemana } from '@/lib/exportar/reportes'
+import { formatoFechaEvento, formatoFechaHora, formatoPesos, hoyISO, leerPrecio, mensajeError } from '@/lib/formato'
 import { useSesion } from '@/lib/sesion'
 
 export default function PaginaTareasSemana() {
@@ -32,18 +32,15 @@ function TareasSemana() {
   const params = useSearchParams()
   const router = useRouter()
   const ruta = usePathname()
-  const { data, isPending, error } = useCajaFuerte(permitido)
-  const { data: cierres } = useCierres(permitido)
+  const { data, cadena, isPending, error } = useCadenaCajaFuerte(permitido)
   const [edicion, setEdicion] = useState<{ pago?: MovimientoManual; dia?: string } | null>(null)
 
   const diaParam = params.get('dia')
   const diaElegido = diaParam && /^\d{4}-\d{2}-\d{2}$/.test(diaParam) ? diaParam : hoyISO()
   const semana = useMemo(() => (data ? resumirSemana(data.manuales, aFecha(diaElegido)) : null), [data, diaElegido])
   const nombres = useMemo(() => (data ? nombresUsados(data.manuales) : []), [data])
-  const saldo = useMemo(
-    () => (data && cierres ? encadenarMeses(resumirPorMes(armarLibro(data.eventos, data.manuales)), cierres).saldoActual : null),
-    [data, cierres],
-  )
+  const saldo = cadena?.saldoActual ?? null
+  const vista = params.get('vista') === 'mes' ? 'mes' : 'semana'
 
   if (!permitido) return <Aviso>No tenés permiso para ver los pagos de tareas.</Aviso>
 
@@ -61,8 +58,23 @@ function TareasSemana() {
         <Boton onClick={() => setEdicion({ dia: esEstaSemana || !semana ? hoy : semana.desde })}>+ Pago</Boton>
       </div>
 
-      {isPending || !semana ? (
+      {/* Por semana / Por mes */}
+      <div className="flex gap-1 rounded-xl border border-borde p-1">
+        {(['semana', 'mes'] as const).map((v) => (
+          <button
+            key={v}
+            onClick={() => router.replace(v === 'mes' ? `${ruta}?vista=mes` : ruta, { scroll: false })}
+            className={cx('flex-1 rounded-lg px-3 py-2 text-sm transition-colors', vista === v ? 'plata font-semibold' : 'text-suave hover:bg-realce hover:text-tinta')}
+          >
+            {v === 'semana' ? 'Por semana' : 'Resumen mensual'}
+          </button>
+        ))}
+      </div>
+
+      {isPending || !semana || !cadena ? (
         error ? <Aviso>{mensajeError(error)}</Aviso> : <Cargando />
+      ) : vista === 'mes' ? (
+        <VistaMes meses={cadena.meses} elegido={params.get('mes')} local={local?.local_nombre ?? ''} irA={(q) => router.replace(`${ruta}?${q}`, { scroll: false })} />
       ) : (
         <>
           {/* Elegir semana */}
@@ -187,6 +199,155 @@ function TareasSemana() {
           />
         )}
       </Ventana>
+    </div>
+  )
+}
+
+/** Resumen de un mes: lo guardado al cerrar el mes (no se borra) o, si es el mes en curso, lo de hoy. */
+function VistaMes({ meses, elegido, local, irA }: { meses: MesEncadenado[]; elegido: string | null; local: string; irA: (query: string) => void }) {
+  const actual = mesActual()
+  // Meses con pagos (y siempre el actual)
+  const tienePagos = (m: MesEncadenado) => [...m.mostrado.renglones, ...m.vivo.renglones].some((r) => r.clase === 'pago')
+  const conPagos = meses.filter((m) => m.clave === actual || tienePagos(m))
+  const clave = elegido && conPagos.some((m) => m.clave === elegido) ? elegido : actual
+  const mes = conPagos.find((m) => m.clave === clave)
+  const resumen = resumirMesTareas(mes?.mostrado.renglones ?? [])
+
+  const porAnio = new Map<number, MesEncadenado[]>()
+  for (const m of conPagos) porAnio.set(m.anio, [...(porAnio.get(m.anio) ?? []), m])
+
+  if (!mes) return <Cargando />
+  const estado = mes.guardado
+    ? mes.guardado.cerrado_en ? `Guardado el ${formatoFechaHora(mes.guardado.cerrado_en)}` : 'Resumen guardado'
+    : mes.clave === actual
+      ? 'Mes en curso (se guarda solo al terminar el mes)'
+      : 'Mes terminado'
+  const desactualizado = mes.desactualizado && resumirMesTareas(mes.vivo.renglones).total !== resumen.total
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        {[...porAnio.entries()]
+          .sort((a, b) => b[0] - a[0])
+          .map(([anio, ms]) => (
+            <div key={anio} className="flex flex-wrap items-center gap-1.5">
+              <span className="w-12 shrink-0 text-sm font-semibold text-suave">{anio}</span>
+              {ms.map((m) => (
+                <button
+                  key={m.clave}
+                  onClick={() => irA(`vista=mes&mes=${m.clave}`)}
+                  className={cx(
+                    'rounded-lg px-2.5 py-1.5 text-sm transition-colors',
+                    m.clave === clave ? 'plata font-semibold' : 'border border-borde text-suave hover:bg-realce hover:text-tinta',
+                  )}
+                >
+                  {nombreMes(m.mes).slice(0, 3)}
+                  {m.clave === actual && <span className="ml-1 text-[10px] opacity-70">(actual)</span>}
+                  {m.guardado && m.clave !== clave && <span className="ml-1 text-[10px] opacity-60">✓</span>}
+                </button>
+              ))}
+            </div>
+          ))}
+        <p className="text-xs text-suave">✓ = resumen guardado. Al terminar cada mes se guarda junto con el de la caja fuerte y no se puede borrar.</p>
+      </div>
+
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">
+            {nombreMes(mes.mes)} {mes.anio}
+          </h2>
+          <p className="text-sm text-suave">{estado}</p>
+        </div>
+        <BotonesExportar compacto crear={() => reporteTareasMes(mes.anio, mes.mes, resumen, local, estado)} />
+      </div>
+
+      {desactualizado && (
+        <Aviso tipo="info">
+          Después de cerrar este mes se cambió o borró algún pago. Acá se muestra lo guardado. Para actualizarlo, entrá a la{' '}
+          <Link href="/caja-fuerte" className="underline">
+            Caja fuerte
+          </Link>
+          , elegí este mes y tocá “Actualizar el resumen guardado”.
+        </Aviso>
+      )}
+
+      <div className="grid grid-cols-2 gap-2">
+        <Tarjeta className="border-marca-500 px-3 py-2.5">
+          <p className="text-xs text-suave">Pagado en el mes</p>
+          <p className="tabular texto-plata text-lg font-semibold">{formatoPesos(resumen.total)}</p>
+        </Tarjeta>
+        <Tarjeta className="px-3 py-2.5">
+          <p className="text-xs text-suave">Horas trabajadas</p>
+          <p className="tabular text-lg font-semibold">{resumen.horas ? textoHoras(resumen.horas) : '—'}</p>
+        </Tarjeta>
+      </div>
+
+      {resumen.pagos.length === 0 ? (
+        <Tarjeta className="px-4 py-8 text-center text-suave">No hay pagos cargados en este mes.</Tarjeta>
+      ) : (
+        <>
+          <section className="space-y-2">
+            <h3 className="text-lg font-semibold">Por persona</h3>
+            <Tarjeta className="divide-y divide-borde">
+              {resumen.porPersona.map((p) => (
+                <div key={p.persona} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{p.persona}</p>
+                    <p className="text-xs text-suave">
+                      {p.pagos} {p.pagos === 1 ? 'pago' : 'pagos'}
+                      {p.horas ? ` · ${textoHoras(p.horas)}` : ''}
+                    </p>
+                  </div>
+                  <p className="tabular shrink-0 font-semibold">{formatoPesos(p.total)}</p>
+                </div>
+              ))}
+            </Tarjeta>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-lg font-semibold">Por semana</h3>
+            <Tarjeta className="divide-y divide-borde">
+              {resumen.porSemana.map((w) => (
+                <button
+                  key={w.desde}
+                  onClick={() => irA(`dia=${w.desde}`)}
+                  className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-realce"
+                >
+                  <span className="min-w-0">
+                    <span className="block font-medium">
+                      {fechaCorta.format(aFecha(w.desde))} al {fechaCorta.format(aFecha(w.hasta))}
+                    </span>
+                    <span className="block text-xs text-suave">
+                      {w.pagos} {w.pagos === 1 ? 'pago' : 'pagos'}
+                      {w.horas ? ` · ${textoHoras(w.horas)}` : ''} · <span className="text-marca-700 underline">Ver semana</span>
+                    </span>
+                  </span>
+                  <span className="tabular shrink-0 font-semibold">{formatoPesos(w.total)}</span>
+                </button>
+              ))}
+            </Tarjeta>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-lg font-semibold">Todos los pagos</h3>
+            <Tarjeta className="divide-y divide-borde">
+              {resumen.pagos.map((p, i) => (
+                <div key={p.ref ?? i} className="flex items-start justify-between gap-3 px-4 py-2.5">
+                  <div className="min-w-0">
+                    <p className="font-medium">{p.persona}</p>
+                    <p className="text-sm text-suave">{p.tareas}</p>
+                    <p className="text-xs text-suave">
+                      <span className="capitalize">{formatoFechaEvento(p.fecha.slice(0, 10))}</span>
+                      {p.horas ? ` · ${textoHoras(p.horas)}` : ''}
+                    </p>
+                  </div>
+                  <p className="tabular shrink-0 font-semibold text-alerta">− {formatoPesos(p.monto)}</p>
+                </div>
+              ))}
+            </Tarjeta>
+          </section>
+        </>
+      )}
     </div>
   )
 }

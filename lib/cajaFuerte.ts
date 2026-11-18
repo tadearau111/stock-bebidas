@@ -1,6 +1,8 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useRef } from 'react'
+import { armarLibro, encadenarMeses, mesActual, resumirPorMes } from './calculos/cajaFuerte'
 import type { AporteEvento, MovimientoManual, RenglonResumen, ResumenMes } from './calculos/cajaFuerte'
 import { mandarAPapelera } from './papelera'
 import { supabase } from './supabase/cliente'
@@ -132,4 +134,32 @@ export function useGuardarCierre() {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['caja-fuerte-cierres'] }),
   })
+}
+
+/**
+ * Caja fuerte completa: libro, resúmenes guardados y meses encadenados
+ * (cada mes arranca con el saldo con que cerró el anterior; manda lo guardado).
+ * Cuando un mes terminó y todavía no tiene su resumen guardado, lo guarda solo.
+ */
+export function useCadenaCajaFuerte(habilitada = true) {
+  const { data, isPending, error } = useCajaFuerte(habilitada)
+  const { data: cierres } = useCierres(habilitada)
+  const guardarCierre = useGuardarCierre()
+  const intentados = useRef(new Set<string>())
+  const actual = mesActual()
+
+  const libro = useMemo(() => (data ? armarLibro(data.eventos, data.manuales) : null), [data])
+  const cadena = useMemo(() => (libro && cierres ? encadenarMeses(resumirPorMes(libro), cierres) : null), [libro, cierres])
+
+  useEffect(() => {
+    if (!cadena) return
+    for (const m of cadena.meses) {
+      if (m.clave >= actual || m.guardado || intentados.current.has(m.clave)) continue
+      intentados.current.add(m.clave)
+      guardarCierre.mutate({ resumen: m.vivo })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cadena, actual])
+
+  return { data, libro, cierres, cadena, guardarCierre, isPending: isPending || (!!data && !cierres), error }
 }
