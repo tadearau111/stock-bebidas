@@ -225,3 +225,42 @@ export function useCambiarPermiso() {
     },
   })
 }
+
+// ------------------------------------------------------------------ Encargados de un evento
+
+/** Quiénes están asignados a un evento (ids de usuario). */
+export function useAsignadosEvento(eventoId: string, habilitado = true) {
+  return useQuery({
+    queryKey: ['asignados-evento', eventoId],
+    enabled: !!eventoId && habilitado,
+    queryFn: async () => {
+      const filas = lanzar(await supabase().from('evento_asignaciones').select('usuario_id').eq('evento_id', eventoId)) as { usuario_id: string }[]
+      return new Set(filas.map((f) => f.usuario_id))
+    },
+  })
+}
+
+/** Asigna o quita un encargado del evento; se marca al instante y vuelve atrás si falla. */
+export function useMarcarEncargado(eventoId: string) {
+  const localId = useLocalId()
+  const qc = useQueryClient()
+  return async (usuarioId: string, asignado: boolean) => {
+    const clave = ['asignados-evento', eventoId]
+    const anterior = qc.getQueryData<Set<string>>(clave)
+    const nuevo = new Set(anterior)
+    if (asignado) nuevo.add(usuarioId)
+    else nuevo.delete(usuarioId)
+    qc.setQueryData(clave, nuevo)
+    try {
+      const sb = supabase()
+      if (asignado) lanzar(await sb.from('evento_asignaciones').insert({ evento_id: eventoId, usuario_id: usuarioId, local_id: localId }))
+      else lanzar(await sb.from('evento_asignaciones').delete().eq('evento_id', eventoId).eq('usuario_id', usuarioId))
+    } catch (e) {
+      qc.setQueryData(clave, anterior)
+      throw e
+    } finally {
+      qc.invalidateQueries({ queryKey: clave })
+      qc.invalidateQueries({ queryKey: ['asignaciones', usuarioId] })
+    }
+  }
+}

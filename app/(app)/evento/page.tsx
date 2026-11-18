@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Fragment, Suspense, useState } from 'react'
+import { ElegirEncargados, NombresEncargados } from '@/components/eventos/Encargados'
 import { FormEvento } from '@/components/eventos/FormEvento'
 import { TIPOS_BARRA } from '@/lib/calculos/evento'
 import { PestanaBarra } from '@/components/eventos/PestanaBarra'
@@ -36,6 +37,7 @@ function Evento() {
   const borrar = useBorrarEvento()
   const archivar = useArchivarEvento()
   const [editando, setEditando] = useState(false)
+  const [eligiendoEncargados, setEligiendoEncargados] = useState(false)
   const [errorAccion, setErrorAccion] = useState('')
 
   const irA = (p: string) => router.replace(`${ruta}?id=${id}&p=${p}`, { scroll: false })
@@ -119,12 +121,18 @@ function Evento() {
               {formatoFechaEvento(evento.fecha)} · {formatoNumero(evento.personas)} personas · {TIPOS_BARRA[evento.tipo_barra ?? 'propia'].nombre}
             </p>
             {evento.notas && <p className="mt-1 text-sm text-suave">{evento.notas}</p>}
+            {puede('usuarios.gestionar') && <NombresEncargados eventoId={evento.id} />}
           </div>
           {puede('eventos.gestionar') && (
             <div className="flex flex-wrap gap-2">
               <Boton variante="secundario" onClick={() => setEditando(true)}>
                 Editar
               </Boton>
+              {puede('usuarios.gestionar') && (
+                <Boton variante="secundario" onClick={() => setEligiendoEncargados(true)}>
+                  Encargados
+                </Boton>
+              )}
               <Boton variante="secundario" onClick={alternarArchivo} cargando={archivar.isPending} textoCargando="…">
                 {evento.archivado ? 'Desarchivar' : 'Archivar'}
               </Boton>
@@ -186,6 +194,9 @@ function Evento() {
         )
       )}
 
+      <Ventana abierta={eligiendoEncargados} alCerrar={() => setEligiendoEncargados(false)} titulo="Encargados del evento">
+        {eligiendoEncargados && <ElegirEncargados eventoId={evento.id} />}
+      </Ventana>
       <Ventana abierta={editando} alCerrar={() => setEditando(false)} titulo="Editar evento">
         {editando && <FormEvento evento={evento} alTerminar={() => setEditando(false)} />}
       </Ventana>
