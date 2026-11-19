@@ -60,12 +60,12 @@ export function ElegirEncargados({ eventoId }: { eventoId: string }) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-suave">
-        Marcá todos los encargados que van a cargar este evento. Solo ellos lo ven en su lista. Se guarda al instante.
+        Marcá a todos los que van a cargar este evento (administradores de la noche y encargados de depósito). Solo ellos lo ven en su lista. Se guarda al instante.
       </p>
       {error && <Aviso>{error}</Aviso>}
       {opciones.length === 0 ? (
         <Aviso tipo="info">
-          Todavía no hay encargados de la noche.{' '}
+          Todavía no hay administradores de la noche ni encargados de depósito.{' '}
           <Link href="/usuarios" className="underline">
             Crealos desde Usuarios
           </Link>

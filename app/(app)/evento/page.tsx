@@ -60,10 +60,13 @@ function Evento() {
 
   const { evento, barras } = detalle
   const barraActiva = barras.find((b) => b.id === pestana)
-  // La pestaña Costos la ve quien gestiona eventos (los encargados de la noche no ven precios ahí)
+  // Qué pestañas ve cada rol (la base de datos también lo controla):
+  // Costos: quien gestiona eventos · Bebida abierta y Resumen: eventos.resumen · Cajeros y Caja: eventos.caja
   const verCostos = puede('eventos.gestionar')
-  const fijas = ['abierta', 'resumen', ...(verCostos ? ['costos'] : []), 'cajeros', 'caja']
-  const actual = barraActiva ? barraActiva.id : fijas.includes(pestana) ? pestana : (barras[0]?.id ?? 'resumen')
+  const verResumen = puede('eventos.resumen')
+  const verCaja = puede('eventos.caja')
+  const fijas = [...(verResumen ? ['abierta', 'resumen'] : []), ...(verCostos ? ['costos'] : []), ...(verCaja ? ['cajeros', 'caja'] : [])]
+  const actual = barraActiva ? barraActiva.id : fijas.includes(pestana) ? pestana : (barras[0]?.id ?? fijas[0] ?? '')
   const barraMostrada = barras.find((b) => b.id === actual)
 
   async function agregarBarra() {
@@ -102,14 +105,8 @@ function Evento() {
     }
   }
 
-  const pestanas = [
-    ...barras.map((b) => ({ id: b.id, nombre: b.nombre })),
-    { id: 'abierta', nombre: 'Bebida abierta' },
-    { id: 'resumen', nombre: 'Resumen' },
-    ...(verCostos ? [{ id: 'costos', nombre: 'Costos' }] : []),
-    { id: 'cajeros', nombre: 'Cajeros' },
-    { id: 'caja', nombre: 'Caja' },
-  ]
+  const nombres: Record<string, string> = { abierta: 'Bebida abierta', resumen: 'Resumen', costos: 'Costos', cajeros: 'Cajeros', caja: 'Caja' }
+  const pestanas = [...barras.map((b) => ({ id: b.id, nombre: b.nombre })), { id: '+barra', nombre: '' }, ...fijas.map((id) => ({ id, nombre: nombres[id] }))]
 
   return (
     <div className="space-y-4">
@@ -160,7 +157,7 @@ function Evento() {
         <div className="flex gap-1 overflow-x-auto py-2">
           {pestanas.map((p) => (
             <Fragment key={p.id}>
-              {p.id === 'abierta' && (
+              {p.id === '+barra' ? (
                 <button
                   onClick={agregarBarra}
                   disabled={carga.guardando}
@@ -168,35 +165,36 @@ function Evento() {
                 >
                   +1 Barra
                 </button>
+              ) : (
+                <button
+                  onClick={() => irA(p.id)}
+                  className={cx(
+                    'shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors',
+                    actual === p.id ? 'plata font-semibold' : 'text-suave hover:bg-realce hover:text-tinta',
+                  )}
+                >
+                  {p.nombre}
+                </button>
               )}
-              <button
-                onClick={() => irA(p.id)}
-                className={cx(
-                  'shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors',
-                  actual === p.id ? 'plata font-semibold' : 'text-suave hover:bg-realce hover:text-tinta',
-                )}
-              >
-                {p.nombre}
-              </button>
             </Fragment>
           ))}
         </div>
       </div>
 
       {barraMostrada ? (
-        <PestanaBarra key={barraMostrada.id} detalle={detalle} barra={barraMostrada} alBorrar={() => irA('resumen')} />
+        <PestanaBarra key={barraMostrada.id} detalle={detalle} barra={barraMostrada} alBorrar={() => irA(barras.find((b) => b.id !== barraMostrada.id)?.id ?? fijas[0] ?? '')} />
+      ) : !actual ? (
+        <Aviso tipo="info">Este evento todavía no tiene barras. Tocá “+1 Barra” para agregar una.</Aviso>
       ) : actual === 'abierta' ? (
         <PestanaBebidaAbierta detalle={detalle} />
+      ) : actual === 'costos' ? (
+        <PestanaCostos detalle={detalle} />
+      ) : actual === 'cajeros' ? (
+        <PestanaCajeros detalle={detalle} />
+      ) : actual === 'caja' ? (
+        <PestanaCaja key={detalle.caja?.actualizado_en ?? 'nueva'} detalle={detalle} />
       ) : (
-        actual === 'costos' ? (
-          <PestanaCostos detalle={detalle} />
-        ) : actual === 'cajeros' ? (
-          <PestanaCajeros detalle={detalle} />
-        ) : actual === 'caja' ? (
-          <PestanaCaja key={detalle.caja?.actualizado_en ?? 'nueva'} detalle={detalle} />
-        ) : (
-          <PestanaResumen detalle={detalle} />
-        )
+        <PestanaResumen detalle={detalle} />
       )}
 
       <Ventana abierta={eligiendoEncargados} alCerrar={() => setEligiendoEncargados(false)} titulo="Encargados del evento">

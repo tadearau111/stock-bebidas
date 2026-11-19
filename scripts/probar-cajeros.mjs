@@ -25,8 +25,8 @@ const r1 = (await admin.from('cajero_retiros').insert({ cajero_id: caj.id, monto
 ok(r1?.evento_id === ev, 'el retiro toma el evento de su cajero')
 ok((await admin.from('cajero_retiros').insert({ cajero_id: caj.id, monto: 0 })).error, 'no se puede cargar un retiro de $ 0')
 
-// Encargado de la noche: sin asignar no ve ni carga; asignado sí
-const rolEnc = (await servicio.from('roles').select('id').eq('nombre', 'Encargado de la noche').single()).data.id
+// Administrador de la noche: sin asignar no ve ni carga; asignado sí
+const rolEnc = (await servicio.from('roles').select('id').eq('nombre', 'Administrador de la noche').single()).data.id
 const { c: enc, id: encId } = await entrar(`enc-caj-${sufijo}@salon.local`, 'Encargado prueba')
 await servicio.from('miembros').insert({ usuario_id: encId, local_id: local, rol_id: rolEnc })
 ok(((await enc.from('evento_cajeros').select('id').eq('evento_id', ev)).data ?? []).length === 0, 'encargado sin asignar no ve los cajeros')

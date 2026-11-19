@@ -6,7 +6,7 @@ const nombres: Nombres = {
   usuarios: new Map([['u1', 'Laura']]),
   articulos: new Map([['a1', 'Coca Cola 2.0 L']]),
   eventos: new Map([['e1', 'Casamiento']]),
-  roles: new Map([['r1', 'Encargado de la noche']]),
+  roles: new Map([['r1', 'Administrador de la noche']]),
 }
 
 describe('Historial en lenguaje simple', () => {
@@ -31,7 +31,7 @@ describe('Historial en lenguaje simple', () => {
   })
 
   it('reemplaza ids por nombres', () => {
-    expect(formatoValor('rol_id', 'r1', nombres)).toBe('Encargado de la noche')
+    expect(formatoValor('rol_id', 'r1', nombres)).toBe('Administrador de la noche')
     expect(formatoValor('usuario_id', 'u1', nombres)).toBe('Laura')
   })
 

@@ -66,6 +66,8 @@ export type Permiso =
   | 'articulos.editar'
   | 'eventos.gestionar'
   | 'eventos.cargar'
+  | 'eventos.caja'
+  | 'eventos.resumen'
   | 'usuarios.gestionar'
   | 'historial.ver'
   | 'info.ver'

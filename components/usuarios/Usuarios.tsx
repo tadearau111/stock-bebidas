@@ -94,7 +94,7 @@ function FormNuevoUsuario({ alTerminar }: { alTerminar: (mensaje?: string) => vo
   const [clave, setClave] = useState(claveProvisoria)
   const [rolId, setRolId] = useState('')
   const [error, setError] = useState('')
-  const rolPorDefecto = roles?.find((r) => r.nombre === 'Encargado de la noche')?.id ?? ''
+  const rolPorDefecto = roles?.find((r) => r.nombre === 'Administrador de la noche')?.id ?? ''
 
   async function enviar(e: FormEvent) {
     e.preventDefault()

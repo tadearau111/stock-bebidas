@@ -68,7 +68,7 @@ const res4 = await admin.rpc('restaurar_de_papelera', { p_id: r3.data })
 ok(!res4.error, 'Restaurando primero el artículo de barra, después la reposición vuelve')
 
 // 4) Permisos: un encargado puede mandar sus cargas a la papelera pero no ver ni restaurar
-const { data: rolEnc } = await servicio.from('roles').select('id').eq('nombre', 'Encargado de la noche').single()
+const { data: rolEnc } = await servicio.from('roles').select('id').eq('nombre', 'Administrador de la noche').single()
 const enc = await entrar(`pap${sufijo}@prueba.local`, 'Encargado papelera')
 await servicio.from('miembros').insert({ usuario_id: enc.id, local_id: local, rol_id: rolEnc.id })
 await admin.from('evento_asignaciones').insert({ evento_id: ev.id, usuario_id: enc.id, local_id: local })

@@ -18,7 +18,7 @@ async function entrar(email, nombre) {
 const { c: admin } = await entrar('admin@salon.local')
 const { data: acceso } = await admin.rpc('mi_acceso')
 const local = acceso[0].local_id
-const { data: rolEnc } = await servicio.from('roles').select('id').eq('nombre', 'Encargado de la noche').single()
+const { data: rolEnc } = await servicio.from('roles').select('id').eq('nombre', 'Administrador de la noche').single()
 const enc = await entrar(`enc${sufijo}@prueba.local`, 'Encargado asignado')
 const otro = await entrar(`otro${sufijo}@prueba.local`, 'Encargado no asignado')
 await servicio.from('miembros').insert([
