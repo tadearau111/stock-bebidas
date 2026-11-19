@@ -6,12 +6,15 @@ import { ajustePorConteo, coincideBusqueda, esCantidadValida } from '@/lib/calcu
 import { useCargarMovimientos, useGuardarArticulo } from '@/lib/datos'
 import { useGuardarProveedor, useProveedores } from '@/lib/proveedores'
 import { ahoraParaInput, detalleArticulo, formatoCantidad, leerPrecio, mensajeError } from '@/lib/formato'
+import { useSesion } from '@/lib/sesion'
 import type { Articulo, Unidad } from '@/lib/tipos'
 
 // =================================================================== Artículo
 
 export function FormArticulo({ articulo, alTerminar }: { articulo?: Articulo; alTerminar: () => void }) {
   const guardar = useGuardarArticulo()
+  // Sin permiso para ver precios, el formulario no los muestra ni los toca
+  const verPrecios = useSesion().puede('precios.ver')
   const [nombre, setNombre] = useState(articulo?.nombre ?? '')
   const [marca, setMarca] = useState(articulo?.marca ?? '')
   const [tamano, setTamano] = useState(articulo?.tamano ?? '')
@@ -40,8 +43,7 @@ export function FormArticulo({ articulo, alTerminar }: { articulo?: Articulo; al
           tamano: tamano.trim() || null,
           unidad,
           stock_minimo: min,
-          precio_costo: pc,
-          precio_mayorista: pm,
+          ...(verPrecios ? { precio_costo: pc, precio_mayorista: pm } : {}),
         },
       })
       alTerminar()
@@ -73,24 +75,26 @@ export function FormArticulo({ articulo, alTerminar }: { articulo?: Articulo; al
           ayuda="Debajo de esto, se marca en rojo"
         />
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Campo
-          etiqueta="Precio de costo"
-          inputMode="decimal"
-          placeholder="Opcional"
-          value={costo}
-          onChange={(e) => setCosto(e.target.value)}
-          ayuda="Para eventos con barra propia"
-        />
-        <Campo
-          etiqueta="Precio mayorista"
-          inputMode="decimal"
-          placeholder="Opcional"
-          value={mayorista}
-          onChange={(e) => setMayorista(e.target.value)}
-          ayuda="Para eventos con barra concesionada"
-        />
-      </div>
+      {verPrecios && (
+        <div className="grid grid-cols-2 gap-3">
+          <Campo
+            etiqueta="Precio de costo"
+            inputMode="decimal"
+            placeholder="Opcional"
+            value={costo}
+            onChange={(e) => setCosto(e.target.value)}
+            ayuda="Para eventos con barra propia"
+          />
+          <Campo
+            etiqueta="Precio mayorista"
+            inputMode="decimal"
+            placeholder="Opcional"
+            value={mayorista}
+            onChange={(e) => setMayorista(e.target.value)}
+            ayuda="Para eventos con barra concesionada"
+          />
+        </div>
+      )}
       {error && <Aviso>{error}</Aviso>}
       <div className="flex gap-2 pt-2">
         <Boton variante="secundario" className="flex-1" onClick={alTerminar}>

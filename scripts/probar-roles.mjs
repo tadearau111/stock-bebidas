@@ -53,6 +53,15 @@ ok(!!(await dep.from('cajero_retiros').insert({ cajero_id: cajero, monto: 5 })).
 ok(!!(await dep.rpc('mandar_a_papelera', { p_tipo: 'gasto', p_id: gasto })).error, 'depósito: NO puede borrar gastos')
 ok(((await dep.from('stock_articulos').select('id').eq('local_id', local)).data ?? []).length > 0, 'depósito: ve el depósito general')
 
+// ---- Precios: solo con permiso
+await admin.from('articulos').update({ precio_costo: 1234, precio_mayorista: 1500 }).eq('id', art)
+const precioDe = async (c) => (await c.from('stock_articulos').select('precio_costo, precio_mayorista').eq('id', art).single()).data
+ok((await precioDe(admin))?.precio_costo == 1234, 'admin: ve los precios en el depósito')
+const pDep = await precioDe(dep)
+ok(pDep && pDep.precio_costo === null && pDep.precio_mayorista === null, 'depósito: ve el artículo pero SIN precios')
+ok(!!(await dep.from('articulos').select('precio_costo').eq('id', art)).error, 'depósito: NO puede leer los precios directo de la tabla')
+ok(!(await dep.from('articulos').select('id, nombre').eq('id', art)).error, 'depósito: sí lee nombre y datos del artículo')
+
 // ---- Administrador de la noche: todo como antes
 const noche = await usuario('Administrador de la noche', `noche-${sufijo}@salon.local`)
 ok(((await noche.from('evento_caja').select('evento_id').eq('evento_id', ev)).data ?? []).length === 1, 'noche: ve la caja')
