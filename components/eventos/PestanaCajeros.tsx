@@ -2,7 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useId, useState } from 'react'
-import { Aviso, Boton, Campo, Tarjeta } from '@/components/ui'
+import { Aviso, Boton, Campo, Tarjeta, cx } from '@/components/ui'
+import { textoDiferencia } from '@/lib/calculos/caja'
 import { resumirCajeros, type ResumenCajero } from '@/lib/calculos/cajeros'
 import { formatoHora, formatoPesos, leerPrecio, mensajeError } from '@/lib/formato'
 import { actualizar, aPapelera, insertar } from '@/lib/offline/cola'
@@ -75,24 +76,30 @@ export function PestanaCajeros({ detalle }: { detalle: DetalleEvento }) {
       <div>
         <h2 className="text-xl font-semibold">Cajeros</h2>
         <p className="text-sm text-suave">
-          Anotá cada retiro de dinero que se le hace a un cajero durante la noche. Es <b>solo de control</b> (para que no se junte mucha plata en las
-          cajas): <b>no suma ni resta</b> en la venta ni en la caja. La venta total se carga igual que siempre en la pestaña Caja.
+          Anotá cada retiro de dinero que se le hace a un cajero durante la noche y, al cerrar, lo que dice el sistema y los posnet de su caja. Es{' '}
+          <b>solo de control</b>: <b>no suma ni resta</b> en la venta ni en la caja. Los totales de la noche se cargan igual que siempre en la pestaña
+          Caja (el resumen de abajo te sirve para controlarlos).
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <Tarjeta className="border-marca-500 px-4 py-3">
-          <p className="text-xs text-suave">Total retirado en la noche</p>
-          <p className="tabular texto-plata text-2xl font-semibold">{formatoPesos(resumen.total)}</p>
-        </Tarjeta>
-        <Tarjeta className="px-4 py-3">
-          <p className="text-xs text-suave">Retiros</p>
-          <p className="tabular text-2xl font-semibold">{resumen.cantidad}</p>
+      {/* Resumen de todas las cajas (mismo orden que el bloque Barras de la pestaña Caja) */}
+      <Tarjeta className="space-y-3 border-marca-500 p-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="text-lg font-semibold">Resumen de todas las cajas</h3>
           <p className="text-xs text-suave">
-            {detalle.cajeros.length} {detalle.cajeros.length === 1 ? 'cajero' : 'cajeros'}
+            {detalle.cajeros.length} {detalle.cajeros.length === 1 ? 'cajero' : 'cajeros'} · {resumen.cantidad}{' '}
+            {resumen.cantidad === 1 ? 'retiro' : 'retiros'}
           </p>
-        </Tarjeta>
-      </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Dato titulo="Efectivo real (total retirado)" valor={formatoPesos(resumen.total)} destacado />
+          <Dato titulo="Efectivo sistema" valor={formatoPesos(resumen.efectivoSistema)} />
+          <Dato titulo="Cierre de lotes" valor={formatoPesos(resumen.cierreLotes)} />
+          <Dato titulo="Tarjetas sistema" valor={formatoPesos(resumen.tarjetasSistema)} />
+          <Diferencia titulo="Diferencia efectivo" valor={resumen.diferenciaEfectivo} />
+          <Diferencia titulo="Diferencia tarjetas" valor={resumen.diferenciaTarjetas} />
+        </div>
+      </Tarjeta>
 
       {resumen.cajeros.length === 0 && (
         <Aviso tipo="info">Todavía no hay cajeros en este evento. Agregá el nombre de cada uno abajo.</Aviso>
@@ -253,6 +260,88 @@ function TarjetaCajero({ c, eventoId }: { c: ResumenCajero; eventoId: string }) 
         + Registrar retiro
       </Boton>
       {error && <Aviso>{error}</Aviso>}
+
+      <CierreCajero key={`${c.cajero.efectivo_sistema}-${c.cajero.tarjetas_sistema}-${c.cajero.cierre_lotes}`} c={c} eventoId={eventoId} />
     </Tarjeta>
+  )
+}
+
+// ------------------------------------------------------------------ Cierre de la caja de un cajero
+
+const miles = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 2 })
+const aTexto = (v: number | null) => (v == null ? '' : miles.format(v))
+
+function CierreCajero({ c, eventoId }: { c: ResumenCajero; eventoId: string }) {
+  const carga = useCargaEvento(eventoId)
+  const [efectivo, setEfectivo] = useState(aTexto(c.efectivoSistema))
+  const [tarjetas, setTarjetas] = useState(aTexto(c.tarjetasSistema))
+  const [lotes, setLotes] = useState(aTexto(c.cierreLotes))
+  const [error, setError] = useState('')
+  const [ok, setOk] = useState('')
+  const hayCambios = efectivo !== aTexto(c.efectivoSistema) || tarjetas !== aTexto(c.tarjetasSistema) || lotes !== aTexto(c.cierreLotes)
+
+  async function guardar() {
+    setError('')
+    setOk('')
+    const valores = { efectivo_sistema: leerPrecio(efectivo), tarjetas_sistema: leerPrecio(tarjetas), cierre_lotes: leerPrecio(lotes) }
+    if (Object.values(valores).some((v) => v != null && (Number.isNaN(v) || v < 0))) {
+      return setError('Hay montos que no son válidos. Usá solo números (ej: 125.000 o 125000,50).')
+    }
+    try {
+      const { sinConexion } = await carga.guardar(`Cierre de la caja de ${c.cajero.nombre}`, [actualizar('evento_cajeros', c.cajero.id, valores)])
+      setOk(sinConexion ? 'Guardado en este celular (se manda solo cuando vuelva internet).' : 'Cierre guardado.')
+      setTimeout(() => setOk(''), 4000)
+    } catch (e) {
+      setError(mensajeError(e))
+    }
+  }
+
+  return (
+    <div className="space-y-3 border-t border-borde pt-3">
+      <div>
+        <p className="font-semibold">Cierre de la caja</p>
+        <p className="text-xs text-suave">Al terminar la noche: lo que dicen el sistema de venta y los posnet de esta caja.</p>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Campo etiqueta="Efectivo sistema" inputMode="decimal" placeholder="$ 0" value={efectivo} onChange={(e) => setEfectivo(e.target.value)} />
+        <Campo etiqueta="Cierre de lotes" inputMode="decimal" placeholder="$ 0" value={lotes} onChange={(e) => setLotes(e.target.value)} ayuda="Lo que dicen los posnet" />
+        <Campo etiqueta="Tarjetas sistema" inputMode="decimal" placeholder="$ 0" value={tarjetas} onChange={(e) => setTarjetas(e.target.value)} />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Diferencia titulo="Diferencia efectivo" valor={c.diferenciaEfectivo} ayuda={`Retirado ${formatoPesos(c.total)} − sistema`} />
+        <Diferencia titulo="Diferencia tarjetas" valor={c.diferenciaTarjetas} ayuda="Lotes − sistema" />
+      </div>
+      {hayCambios && (
+        <Boton className="w-full" onClick={guardar} cargando={carga.guardando}>
+          Guardar cierre
+        </Boton>
+      )}
+      {ok && <Aviso tipo="ok">✓ {ok}</Aviso>}
+      {error && <Aviso>{error}</Aviso>}
+    </div>
+  )
+}
+
+// ------------------------------------------------------------------ Piezas
+
+function Dato({ titulo, valor, destacado }: { titulo: string; valor: string; destacado?: boolean }) {
+  return (
+    <div className="rounded-lg bg-realce px-3 py-2.5">
+      <p className="text-xs text-suave">{titulo}</p>
+      <p className={cx('tabular text-lg font-semibold', destacado && 'texto-plata')}>{valor}</p>
+    </div>
+  )
+}
+
+/** Diferencia con colores, igual que en la pestaña Caja. Vacía mientras no se cargó lo del sistema. */
+function Diferencia({ titulo, valor, ayuda }: { titulo: string; valor: number | null; ayuda?: string }) {
+  const color = valor == null ? 'text-suave' : valor === 0 ? 'text-emerald-400' : valor < 0 ? 'text-alerta' : 'text-amber-300'
+  return (
+    <div className="rounded-lg bg-realce px-3 py-2.5">
+      <p className="text-xs text-suave">{titulo}</p>
+      <p className={cx('tabular text-lg font-semibold', color)}>{valor == null ? '—' : formatoPesos(valor)}</p>
+      <p className={cx('text-[11px]', color)}>{valor == null ? 'Falta cargar el sistema' : textoDiferencia(valor, formatoPesos)}</p>
+      {ayuda && <p className="text-[11px] text-suave">{ayuda}</p>}
+    </div>
   )
 }

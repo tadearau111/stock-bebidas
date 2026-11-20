@@ -393,19 +393,35 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
     }
   }
 
-  // Retiros de dinero a los cajeros (solo control)
+  // Cajeros: retiros de la noche y cierre de cada caja (solo control)
   const cajeros = resumirCajeros(detalle.cajeros ?? [], detalle.retirosCajeros ?? [])
+  const hayCierre = cajeros.cajeros.some((c) => c.efectivoSistema != null || c.tarjetasSistema != null || c.cierreLotes != null)
+  if (cajeros.cantidad || hayCierre) {
+    secciones.push({
+      titulo: 'Cajeros: resumen de las cajas (control)',
+      columnas: [
+        { titulo: 'Cajero' },
+        { titulo: 'Efectivo real (retirado)', tipo: 'pesos' },
+        { titulo: 'Efectivo sistema', tipo: 'pesos' },
+        { titulo: 'Dif. efectivo', tipo: 'pesos' },
+        { titulo: 'Cierre de lotes', tipo: 'pesos' },
+        { titulo: 'Tarjetas sistema', tipo: 'pesos' },
+        { titulo: 'Dif. tarjetas', tipo: 'pesos' },
+      ],
+      filas: cajeros.cajeros.map((c) => [c.cajero.nombre, c.total, c.efectivoSistema, c.diferenciaEfectivo, c.cierreLotes, c.tarjetasSistema, c.diferenciaTarjetas]),
+      resaltar: cajeros.cajeros.map((c, i) => ((c.diferenciaEfectivo ?? 0) < 0 || (c.diferenciaTarjetas ?? 0) < 0 ? i : -1)).filter((i) => i >= 0),
+      total: ['Total', cajeros.total, cajeros.efectivoSistema, cajeros.diferenciaEfectivo, cajeros.cierreLotes, cajeros.tarjetasSistema, cajeros.diferenciaTarjetas],
+      nota: 'Solo control: no suma ni resta en la venta ni en la caja. Efectivo real = total retirado al cajero en la noche. Diferencia = real - sistema (negativo: falta plata).',
+    })
+  }
   if (cajeros.cantidad) {
     secciones.push({
       titulo: 'Retiros a cajeros (control)',
       columnas: [{ titulo: 'Cajero' }, { titulo: 'Hora' }, { titulo: 'Notas' }, { titulo: 'Monto', tipo: 'pesos' }],
       filas: cajeros.cajeros.flatMap((c) =>
-        c.retiros.length
-          ? c.retiros.map((r) => [c.cajero.nombre, fechaHora.format(new Date(r.hora)).replace(/\u00a0|\u202f/g, ' '), r.notas ?? '', r.monto] as Celda[])
-          : ([[c.cajero.nombre, null, 'Sin retiros', 0]] as Celda[][]),
+        c.retiros.map((r) => [c.cajero.nombre, fechaHora.format(new Date(r.hora)).replace(/\u00a0|\u202f/g, ' '), r.notas ?? '', r.monto] as Celda[]),
       ),
       total: ['Total retirado a cajeros', null, null, cajeros.total],
-      nota: 'Solo control de seguridad: no suma ni resta en la venta ni en la caja. ' + cajeros.cajeros.map((c) => `${c.cajero.nombre}: ${textoCelda(c.total, 'pesos')}`).join(' · '),
     })
   }
 

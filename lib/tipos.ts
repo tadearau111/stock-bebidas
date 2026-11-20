@@ -170,6 +170,10 @@ export interface CajeroDB {
   evento_id: string
   nombre: string
   orden: number
+  /** Cierre de su caja (lo que dice el sistema de venta y los posnet) */
+  efectivo_sistema?: number | null
+  tarjetas_sistema?: number | null
+  cierre_lotes?: number | null
 }
 
 /** Retiro de dinero que se le hace a un cajero durante la noche (solo control) */

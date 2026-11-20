@@ -98,7 +98,12 @@ export function opcionesEvento(id: string) {
         bebidaAbierta: lanzar(abierta) as DetalleEvento['bebidaAbierta'],
         caja: lanzar(caja) as DetalleEvento['caja'],
         gastos: lanzar(gastos) as DetalleEvento['gastos'],
-        cajeros: lanzar(cajeros) as DetalleEvento['cajeros'],
+        cajeros: (lanzar(cajeros) as DetalleEvento['cajeros']).map((c) => ({
+          ...c,
+          efectivo_sistema: c.efectivo_sistema == null ? null : Number(c.efectivo_sistema),
+          tarjetas_sistema: c.tarjetas_sistema == null ? null : Number(c.tarjetas_sistema),
+          cierre_lotes: c.cierre_lotes == null ? null : Number(c.cierre_lotes),
+        })),
         retirosCajeros: (lanzar(retirosCajeros) as DetalleEvento['retirosCajeros']).map((r) => ({ ...r, monto: Number(r.monto) })),
       }
     },
