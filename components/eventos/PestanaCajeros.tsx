@@ -252,7 +252,7 @@ function TarjetaCajero({ c, eventoId }: { c: ResumenCajero; eventoId: string }) 
       )}
 
       <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-2">
-        <Campo etiqueta="Monto retirado" inputMode="decimal" placeholder="$ 0" value={monto} onChange={(e) => setMonto(e.target.value)} />
+        <Campo etiqueta="Monto retirado (efectivo real)" inputMode="decimal" placeholder="$ 0" value={monto} onChange={(e) => setMonto(e.target.value)} />
         <Campo etiqueta="Hora" type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
       </div>
       <Campo etiqueta="Notas (opcional)" placeholder="Ej: retiró Laura" value={notas} onChange={(e) => setNotas(e.target.value)} />
