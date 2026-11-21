@@ -398,7 +398,7 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
   const hayCierre = cajeros.cajeros.some((c) => c.efectivoSistema != null || c.tarjetasSistema != null || c.cierreLotes != null)
   if (cajeros.cantidad || hayCierre) {
     secciones.push({
-      titulo: 'Cajeros: resumen de las cajas (control)',
+      titulo: 'Cajeros: resumen de las cajas',
       columnas: [
         { titulo: 'Cajero' },
         { titulo: 'Efectivo real (retirado)', tipo: 'pesos' },
@@ -411,12 +411,12 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
       filas: cajeros.cajeros.map((c) => [c.cajero.nombre, c.total, c.efectivoSistema, c.diferenciaEfectivo, c.cierreLotes, c.tarjetasSistema, c.diferenciaTarjetas]),
       resaltar: cajeros.cajeros.map((c, i) => ((c.diferenciaEfectivo ?? 0) < 0 || (c.diferenciaTarjetas ?? 0) < 0 ? i : -1)).filter((i) => i >= 0),
       total: ['Total', cajeros.total, cajeros.efectivoSistema, cajeros.diferenciaEfectivo, cajeros.cierreLotes, cajeros.tarjetasSistema, cajeros.diferenciaTarjetas],
-      nota: 'Solo control: no suma ni resta en la venta ni en la caja. Efectivo real = total retirado al cajero en la noche. Diferencia = real - sistema (negativo: falta plata).',
+      nota: 'El total de todas las cajas es lo que pasa solo al bloque Barras de la Caja (salvo en eventos cargados a mano). Efectivo real = total retirado al cajero en la noche. Diferencia = real - sistema (negativo: falta plata).',
     })
   }
   if (cajeros.cantidad) {
     secciones.push({
-      titulo: 'Retiros a cajeros (control)',
+      titulo: 'Retiros a cajeros',
       columnas: [{ titulo: 'Cajero' }, { titulo: 'Hora' }, { titulo: 'Notas' }, { titulo: 'Monto', tipo: 'pesos' }],
       filas: cajeros.cajeros.flatMap((c) =>
         c.retiros.map((r) => [c.cajero.nombre, fechaHora.format(new Date(r.hora)).replace(/\u00a0|\u202f/g, ' '), r.notas ?? '', r.monto] as Celda[]),

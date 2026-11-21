@@ -3,6 +3,7 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Aviso, Boton, Campo, Tarjeta, cx } from '@/components/ui'
 import { CAJA_VACIA, calcularCaja, textoDiferencia, type DatosCaja } from '@/lib/calculos/caja'
+import { resumirCajeros } from '@/lib/calculos/cajeros'
 import { formatoFechaHora, formatoHora, formatoPesos, leerPrecio, mensajeError } from '@/lib/formato'
 import { aPapelera, guardarCaja, insertar } from '@/lib/offline/cola'
 import { useCargaEvento } from '@/lib/offline/sincronizar'
@@ -29,6 +30,22 @@ export function PestanaCaja({ detalle }: { detalle: DetalleEvento }) {
   const [error, setError] = useState('')
   const [ok, setOk] = useState('')
 
+  // Barras se suma sola con el resumen de todas las cajas (pestaña Cajeros), salvo que se haya cargado a mano
+  const hayCajeros = (detalle.cajeros ?? []).length > 0
+  const automatico = hayCajeros && (guardada?.barras_automatico ?? true)
+  const auto = useMemo((): Partial<DatosCaja> => {
+    if (!automatico) return {}
+    const r = resumirCajeros(detalle.cajeros ?? [], detalle.retirosCajeros ?? [])
+    const algun = (f: (c: (typeof r.cajeros)[number]) => number | null) => r.cajeros.some((c) => f(c) != null)
+    return {
+      efectivo_real: r.cantidad ? r.total : null,
+      efectivo_sistema: algun((c) => c.efectivoSistema) ? r.efectivoSistema : null,
+      cierre_lotes: algun((c) => c.cierreLotes) ? r.cierreLotes : null,
+      tarjetas_sistema: algun((c) => c.tarjetasSistema) ? r.tarjetasSistema : null,
+    }
+  }, [automatico, detalle.cajeros, detalle.retirosCajeros])
+  const esAuto = (k: CampoCaja) => k in auto
+
   // Valores numéricos a partir de lo que se está escribiendo (los cálculos se ven al instante)
   const valores = useMemo(() => {
     const v = {} as DatosCaja
@@ -38,9 +55,11 @@ export function PestanaCaja({ detalle }: { detalle: DetalleEvento }) {
     }
     return v
   }, [textos])
-  const invalidos = (Object.keys(valores) as CampoCaja[]).filter((k) => valores[k] != null && (Number.isNaN(valores[k]) || (valores[k] as number) < 0))
+  const invalidos = (Object.keys(valores) as CampoCaja[]).filter(
+    (k) => !esAuto(k) && valores[k] != null && (Number.isNaN(valores[k]) || (valores[k] as number) < 0),
+  )
   const r = calcularCaja(
-    Object.fromEntries(Object.entries(valores).map(([k, v]) => [k, Number.isNaN(v) ? null : v])) as unknown as DatosCaja,
+    { ...(Object.fromEntries(Object.entries(valores).map(([k, v]) => [k, Number.isNaN(v) ? null : v])) as unknown as DatosCaja), ...auto },
     detalle.gastos,
   )
   const hayCambios = (Object.keys(textos) as CampoCaja[]).some((k) => textos[k] !== inicial[k])
@@ -56,7 +75,9 @@ export function PestanaCaja({ detalle }: { detalle: DetalleEvento }) {
     if (invalidos.length) return setError('Hay montos que no son válidos. Usá solo números (ej: 125.000 o 125000,50).')
     if (valores.vasos_no_devueltos != null && !Number.isInteger(valores.vasos_no_devueltos)) return setError('Los vasos no devueltos tienen que ser un número entero.')
     try {
-      const { sinConexion } = await carga.guardar('Caja del evento', [guardarCaja({ evento_id: eventoId, local_id: localId, ...valores })])
+      // Lo que se suma solo desde los cajeros no se manda (lo calcula la base)
+      const datos = Object.fromEntries(Object.entries(valores).filter(([k]) => !esAuto(k as CampoCaja)))
+      const { sinConexion } = await carga.guardar('Caja del evento', [guardarCaja({ evento_id: eventoId, local_id: localId, ...datos })])
       setOk(sinConexion ? 'Caja guardada en este celular (se manda sola cuando vuelva internet).' : 'Caja guardada.')
       setTimeout(() => setOk(''), 4000)
     } catch (err) {
@@ -64,17 +85,35 @@ export function PestanaCaja({ detalle }: { detalle: DetalleEvento }) {
     }
   }
 
-  const campo = (k: CampoCaja, etiqueta: string, ayuda?: string) => (
-    <Campo
-      etiqueta={etiqueta}
-      inputMode={k === 'vasos_no_devueltos' ? 'numeric' : 'decimal'}
-      placeholder={k === 'vasos_no_devueltos' ? '0' : '$ 0'}
-      value={textos[k]}
-      onChange={cambiar(k)}
-      error={invalidos.includes(k) ? 'Monto inválido' : undefined}
-      ayuda={ayuda}
-    />
-  )
+  async function usarResumenCajeros() {
+    setError('')
+    if (
+      !confirm(
+        'Los números de Barras de este evento se cargaron a mano. ¿Reemplazarlos por el resumen de todas las cajas (pestaña Cajeros)?\n\nDesde ahora se van a sumar solos. El valor anterior queda en el Historial.',
+      )
+    )
+      return
+    try {
+      await carga.guardar('Caja: usar el resumen de cajeros', [guardarCaja({ evento_id: eventoId, local_id: localId, barras_automatico: true })])
+    } catch (err) {
+      setError(mensajeError(err))
+    }
+  }
+
+  const campo = (k: CampoCaja, etiqueta: string, ayuda?: string) =>
+    esAuto(k) ? (
+      <Campo etiqueta={etiqueta} value={aTexto(auto[k] ?? null)} placeholder="$ 0" disabled readOnly ayuda="Suma de los cajeros" />
+    ) : (
+      <Campo
+        etiqueta={etiqueta}
+        inputMode={k === 'vasos_no_devueltos' ? 'numeric' : 'decimal'}
+        placeholder={k === 'vasos_no_devueltos' ? '0' : '$ 0'}
+        value={textos[k]}
+        onChange={cambiar(k)}
+        error={invalidos.includes(k) ? 'Monto inválido' : undefined}
+        ayuda={ayuda}
+      />
+    )
 
   return (
     <form onSubmit={guardar} className="space-y-5">
@@ -93,7 +132,22 @@ export function PestanaCaja({ detalle }: { detalle: DetalleEvento }) {
         <Total titulo="Venta total + boletería + guardarropas" valor={formatoPesos(r.ventaTotalGeneral)} destacado />
       </div>
 
-      <Bloque titulo="Barras" ayuda="Efectivo y tarjetas reales contra lo que dice el sistema de venta.">
+      <Bloque
+        titulo="Barras"
+        ayuda={
+          automatico
+            ? 'Se suma sola con el resumen de todas las cajas de la pestaña Cajeros (efectivo real = total retirado a los cajeros).'
+            : 'Efectivo y tarjetas reales contra lo que dice el sistema de venta.'
+        }
+      >
+        {hayCajeros && !automatico && (
+          <Aviso tipo="info">
+            En este evento los números de Barras se cargaron a mano.{' '}
+            <button type="button" onClick={usarResumenCajeros} className="font-semibold underline">
+              Usar el resumen de cajeros
+            </button>
+          </Aviso>
+        )}
         <div className="grid grid-cols-2 gap-3">
           {campo('efectivo_real', 'Efectivo real', 'Lo que hay en la caja')}
           {campo('efectivo_sistema', 'Efectivo sistema', 'Según el sistema de venta')}

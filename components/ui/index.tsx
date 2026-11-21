@@ -58,7 +58,7 @@ export function Campo({
         id={id}
         {...props}
         className={cx(
-          'block min-h-11 w-full rounded-lg border bg-superficie px-3 outline-none focus:border-marca-500 focus:ring-2 focus:ring-marca-100',
+          'block min-h-11 w-full rounded-lg border bg-superficie px-3 outline-none focus:border-marca-500 focus:ring-2 focus:ring-marca-100 disabled:cursor-default disabled:bg-realce disabled:font-semibold',
           error ? 'border-alerta' : 'border-borde',
         )}
       />

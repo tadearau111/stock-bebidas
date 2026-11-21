@@ -150,6 +150,8 @@ export interface BebidaAbiertaDB {
 
 export interface CajaDB extends DatosCaja {
   evento_id: string
+  /** true: el bloque Barras se suma solo desde los cajeros (si el evento tiene cajeros) */
+  barras_automatico?: boolean
   notas: string | null
   actualizado_en: string
   actualizado_por: string | null

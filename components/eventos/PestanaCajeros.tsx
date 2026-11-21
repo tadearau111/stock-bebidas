@@ -76,9 +76,8 @@ export function PestanaCajeros({ detalle }: { detalle: DetalleEvento }) {
       <div>
         <h2 className="text-xl font-semibold">Cajeros</h2>
         <p className="text-sm text-suave">
-          Anotá cada retiro de dinero que se le hace a un cajero durante la noche y, al cerrar, lo que dice el sistema y los posnet de su caja. Es{' '}
-          <b>solo de control</b>: <b>no suma ni resta</b> en la venta ni en la caja. Los totales de la noche se cargan igual que siempre en la pestaña
-          Caja (el resumen de abajo te sirve para controlarlos).
+          Anotá cada retiro de dinero que se le hace a un cajero durante la noche y, al cerrar, lo que dice el sistema y los posnet de su caja. El{' '}
+          <b>resumen de todas las cajas</b> pasa solo a la pestaña <b>Caja</b> (bloque Barras): efectivo real = total retirado a los cajeros.
         </p>
       </div>
 
