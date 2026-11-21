@@ -16,9 +16,9 @@ import {
   type ArticuloPrecio,
   type TipoBarra,
 } from '../calculos/evento'
-import { CAJA_VACIA, cajaCargada, calcularCaja } from '../calculos/caja'
+import { cajaCargada, calcularCaja } from '../calculos/caja'
 import { nombreMes, type RenglonResumen } from '../calculos/cajaFuerte'
-import { resumirCajeros } from '../calculos/cajeros'
+import { cajaDelEvento, resumirCajeros } from '../calculos/cajeros'
 import type { ResumenMesTareas } from '../calculos/tareas'
 import type { Articulo, DetalleEvento } from '../tipos'
 
@@ -347,11 +347,11 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
     })
   }
 
-  // Caja (si se cargó algo)
-  const hayCaja = cajaCargada(detalle.caja, detalle.gastos)
-  const caja = calcularCaja(detalle.caja ?? CAJA_VACIA, detalle.gastos)
+  // Caja (si se cargó algo): los mismos números que la pestaña Caja (con cajeros, Barras es la suma de las cajas)
+  const { datos: c } = cajaDelEvento(detalle)
+  const hayCaja = cajaCargada(c, detalle.gastos)
+  const caja = calcularCaja(c, detalle.gastos)
   if (hayCaja) {
-    const c = detalle.caja ?? CAJA_VACIA
     secciones.push({
       titulo: 'Caja',
       columnas: [{ titulo: 'Concepto' }, { titulo: 'Monto', tipo: 'pesos' }],
@@ -467,16 +467,36 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
     lineasWa.push('', `${TIPOS_BARRA[tipo].nombre}`, `*Total a ${precio}:* ${textoCelda(costos.total, 'pesos')}`)
   }
 
-  if (hayCaja) {
+  if (hayCaja || cajeros.cajeros.length) {
+    const $ = (v: number | null | undefined) => textoCelda(v ?? 0, 'pesos')
+    const dif = (v: number | null) => (v == null ? 'falta sistema' : v === 0 ? 'coincide' : v > 0 ? `sobran ${$(v)}` : `faltan ${$(-v)}`)
     lineasWa.push(
       '',
-      '*Caja*',
-      `Venta caja barras: ${textoCelda(caja.ventaCaja, 'pesos')}`,
-      `Diferencia efectivo: ${textoCelda(caja.diferenciaEfectivo, 'pesos')} · Diferencia tarjetas: ${textoCelda(caja.diferenciaTarjetas, 'pesos')}`,
-      `Boletería: ${textoCelda(caja.totalBoleteria, 'pesos')} · Guardarropas: ${textoCelda(caja.totalGuardarropas, 'pesos')}`,
-      `Gastos: ${textoCelda(caja.totalGastos, 'pesos')}`,
-      `*Venta total + boletería + guardarropas:* ${textoCelda(caja.ventaTotalGeneral, 'pesos')}`,
-      `*Retiro a caja fuerte:* ${textoCelda(caja.retiroCajaFuerte, 'pesos')}`,
+      '*CAJA*',
+      '*Barras*',
+      `Efectivo real: ${$(c.efectivo_real)} · Sistema: ${$(c.efectivo_sistema)} (${dif(caja.diferenciaEfectivo)})`,
+      `Cierre de lotes: ${$(c.cierre_lotes)} · Tarjetas sistema: ${$(c.tarjetas_sistema)} (${dif(caja.diferenciaTarjetas)})`,
+      `*Venta total caja (barras):* ${$(caja.ventaCaja)}`,
+    )
+    if (cajeros.cajeros.length) {
+      lineasWa.push('', `*Cajeros* (${cajeros.cajeros.length})`)
+      for (const k of cajeros.cajeros) {
+        lineasWa.push(
+          `• ${k.cajero.nombre}: retirado ${$(k.total)} (${k.retiros.length} ${k.retiros.length === 1 ? 'retiro' : 'retiros'}) · efectivo ${dif(k.diferenciaEfectivo)} · tarjetas ${dif(k.diferenciaTarjetas)}`,
+        )
+      }
+    }
+    lineasWa.push(
+      '',
+      `*Boletería:* ${$(caja.totalBoleteria)} (efectivo ${$(c.boleteria_efectivo)} + lotes ${$(c.boleteria_lotes)})`,
+      `*Guardarropas:* ${$(caja.totalGuardarropas)} (efectivo ${$(c.guardarropas_efectivo)} + lotes ${$(c.guardarropas_lotes)})`,
+      '',
+      `*Gastos de la noche:* ${$(caja.totalGastos)}`,
+      ...detalle.gastos.map((g) => `• ${g.detalle}: ${$(g.monto)}`),
+      '',
+      `Cambio próxima caja: ${$(c.cambio_proxima_caja)} · Vasos no devueltos: ${c.vasos_no_devueltos ?? 0}`,
+      `*Venta total + boletería + guardarropas:* ${$(caja.ventaTotalGeneral)}`,
+      `*Retiro a caja fuerte:* ${$(caja.retiroCajaFuerte)}`,
     )
   }
 

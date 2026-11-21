@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { resumirCajeros } from './cajeros'
+import { CAJA_VACIA } from './caja'
+import { cajaDelEvento, resumirCajeros } from './cajeros'
 
 const cajero = (id: string, nombre: string) => ({ id, evento_id: 'e', nombre, orden: 0 })
 const retiro = (id: string, cajero_id: string, monto: number, hora: string) => ({ id, cajero_id, evento_id: 'e', monto, hora, notas: null })
@@ -41,5 +42,23 @@ describe('Cierre de cada cajero', () => {
     expect([r.efectivoSistema, r.tarjetasSistema, r.cierreLotes]).toEqual([440_000.5, 500_000, 618_000])
     expect(r.diferenciaEfectivo).toBe(-10_000)
     expect(r.diferenciaTarjetas).toBe(118_000)
+  })
+})
+
+describe('Caja del evento con cajeros', () => {
+  const cajeros = [{ ...cajero('c1', 'Sofía'), efectivo_sistema: 100, cierre_lotes: 50, tarjetas_sistema: null }]
+  const retiros = [retiro('r1', 'c1', 120, '2026-11-21T01:00:00Z')]
+  it('con cajeros, Barras es la suma de las cajas y lo demás queda igual', () => {
+    const { datos, automatico } = cajaDelEvento({ caja: { ...CAJA_VACIA, efectivo_real: 999, boleteria_efectivo: 30 }, cajeros, retirosCajeros: retiros })
+    expect(automatico).toBe(true)
+    expect([datos.efectivo_real, datos.efectivo_sistema, datos.cierre_lotes, datos.tarjetas_sistema, datos.boleteria_efectivo]).toEqual([120, 100, 50, null, 30])
+  })
+  it('si se cargó a mano, se respeta', () => {
+    const { datos, automatico } = cajaDelEvento({ caja: { ...CAJA_VACIA, efectivo_real: 999, barras_automatico: false }, cajeros, retirosCajeros: retiros })
+    expect(automatico).toBe(false)
+    expect(datos.efectivo_real).toBe(999)
+  })
+  it('sin cajeros, es lo guardado', () => {
+    expect(cajaDelEvento({ caja: null }).datos).toEqual(CAJA_VACIA)
   })
 })

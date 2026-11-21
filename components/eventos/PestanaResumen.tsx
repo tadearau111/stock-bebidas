@@ -15,6 +15,7 @@ import {
   type TipoBarra,
 } from '@/lib/calculos/evento'
 import { BotonesExportar } from '@/components/Exportar'
+import { ResumenCajaEvento } from './ResumenCajaEvento'
 import { useArticulos } from '@/lib/datos'
 import { reporteEvento } from '@/lib/exportar/reportes'
 import { useSesion } from '@/lib/sesion'
@@ -255,6 +256,9 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
           </Tarjeta>
         )}
       </section>
+
+      {/* La caja completa (solo quien puede ver la Caja) */}
+      {puede('eventos.caja') && <ResumenCajaEvento detalle={detalle} />}
     </div>
   )
 }

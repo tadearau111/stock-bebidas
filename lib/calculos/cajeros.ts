@@ -7,6 +7,7 @@
 // Diferencia tarjetas = cierre de lotes − tarjetas sistema
 
 import type { CajeroDB, RetiroCajeroDB } from '../tipos'
+import { CAJA_VACIA, type DatosCaja } from './caja'
 
 export interface ResumenCajero {
   cajero: CajeroDB
@@ -67,5 +68,33 @@ export function resumirCajeros(cajeros: CajeroDB[], retiros: RetiroCajeroDB[]): 
     cierreLotes: suma(lista.map((c) => c.cierreLotes)),
     diferenciaEfectivo: conEfectivo.length ? suma(conEfectivo.map((c) => c.diferenciaEfectivo)) : null,
     diferenciaTarjetas: conTarjetas.length ? suma(conTarjetas.map((c) => c.diferenciaTarjetas)) : null,
+  }
+}
+
+/**
+ * Los números de la Caja del evento tal como se ven en la pestaña Caja: lo
+ * guardado y, si el evento tiene cajeros (y no se cargó a mano), el bloque
+ * Barras con la suma de todas las cajas.
+ */
+export function cajaDelEvento(detalle: {
+  caja: (DatosCaja & { barras_automatico?: boolean }) | null
+  cajeros?: CajeroDB[]
+  retirosCajeros?: RetiroCajeroDB[]
+}): { datos: DatosCaja; automatico: boolean } {
+  const base: DatosCaja = { ...CAJA_VACIA, ...(detalle.caja ?? {}) }
+  const hayCajeros = (detalle.cajeros ?? []).length > 0
+  const automatico = hayCajeros && (detalle.caja?.barras_automatico ?? true)
+  if (!automatico) return { datos: base, automatico }
+  const r = resumirCajeros(detalle.cajeros ?? [], detalle.retirosCajeros ?? [])
+  const algun = (f: (c: ResumenCajero) => number | null) => r.cajeros.some((c) => f(c) != null)
+  return {
+    automatico,
+    datos: {
+      ...base,
+      efectivo_real: r.cantidad ? r.total : null,
+      efectivo_sistema: algun((c) => c.efectivoSistema) ? r.efectivoSistema : null,
+      cierre_lotes: algun((c) => c.cierreLotes) ? r.cierreLotes : null,
+      tarjetas_sistema: algun((c) => c.tarjetasSistema) ? r.tarjetasSistema : null,
+    },
   }
 }
