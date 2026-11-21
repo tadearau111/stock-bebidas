@@ -478,14 +478,6 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
       `Cierre de lotes: ${$(c.cierre_lotes)} · Tarjetas sistema: ${$(c.tarjetas_sistema)} (${dif(caja.diferenciaTarjetas)})`,
       `*Venta total caja (barras):* ${$(caja.ventaCaja)}`,
     )
-    if (cajeros.cajeros.length) {
-      lineasWa.push('', `*Cajeros* (${cajeros.cajeros.length})`)
-      for (const k of cajeros.cajeros) {
-        lineasWa.push(
-          `• ${k.cajero.nombre}: retirado ${$(k.total)} (${k.retiros.length} ${k.retiros.length === 1 ? 'retiro' : 'retiros'}) · efectivo ${dif(k.diferenciaEfectivo)} · tarjetas ${dif(k.diferenciaTarjetas)}`,
-        )
-      }
-    }
     lineasWa.push(
       '',
       `*Boletería:* ${$(caja.totalBoleteria)} (efectivo ${$(c.boleteria_efectivo)} + lotes ${$(c.boleteria_lotes)})`,
