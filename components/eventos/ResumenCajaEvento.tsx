@@ -41,24 +41,6 @@ export function ResumenCajaEvento({ detalle }: { detalle: DetalleEvento }) {
           <Fila texto="Venta total caja" valor={formatoPesos(r.ventaCaja)} fuerte />
         </Grupo>
 
-        {cajeros.cajeros.length > 0 && (
-          <Grupo titulo={`Cajeros (${cajeros.cajeros.length})`}>
-            {cajeros.cajeros.map((k) => (
-              <div key={k.cajero.id} className="py-1.5 text-sm">
-                <div className="flex justify-between gap-3">
-                  <span className="font-medium">{k.cajero.nombre}</span>
-                  <span className="tabular font-semibold">{formatoPesos(k.total)}</span>
-                </div>
-                <p className="text-xs text-suave">
-                  {k.retiros.length} {k.retiros.length === 1 ? 'retiro' : 'retiros'}
-                  {k.retiros.length > 0 && ` (${k.retiros.map((x) => formatoHora(x.hora)).join(', ')})`} · Efectivo:{' '}
-                  <TextoDif valor={k.diferenciaEfectivo} /> · Tarjetas: <TextoDif valor={k.diferenciaTarjetas} />
-                </p>
-              </div>
-            ))}
-          </Grupo>
-        )}
-
         <Grupo titulo="Boletería y guardarropas">
           <Fila texto="Boletería · efectivo real" valor={formatoPesos(c.boleteria_efectivo ?? 0)} />
           <Fila texto="Boletería · cierre de lotes" valor={formatoPesos(c.boleteria_lotes ?? 0)} />
@@ -88,10 +70,6 @@ export function ResumenCajaEvento({ detalle }: { detalle: DetalleEvento }) {
 }
 
 const colorDif = (v: number | null) => (v == null ? 'text-suave' : v === 0 ? 'text-emerald-400' : v < 0 ? 'text-alerta' : 'text-amber-300')
-
-function TextoDif({ valor }: { valor: number | null }) {
-  return <span className={colorDif(valor)}>{valor == null ? 'falta el sistema' : textoDiferencia(valor, formatoPesos).toLowerCase()}</span>
-}
 
 function Dato({ titulo, valor, destacado, ancho, rojo }: { titulo: string; valor: string; destacado?: boolean; ancho?: boolean; rojo?: boolean }) {
   return (
