@@ -26,7 +26,15 @@ export function ResumenCajaEvento({ detalle }: { detalle: DetalleEvento }) {
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <Dato titulo="Venta total caja (barras)" valor={formatoPesos(r.ventaCaja)} />
         <Dato titulo="Gastos totales" valor={formatoPesos(r.totalGastos)} />
-        <Dato titulo="Retiro a caja fuerte" valor={formatoPesos(r.retiroCajaFuerte)} rojo={r.retiroCajaFuerte < 0} />
+        <Dato
+          titulo="Retiro a caja fuerte"
+          valor={formatoPesos(r.retiroCajaFuerte)}
+          detalle={
+            `Efectivo real ${formatoPesos(r.efectivoTotal)} − gastos ${formatoPesos(r.totalGastos)}` +
+            (c.cambio_proxima_caja ? ` − cambio ${formatoPesos(c.cambio_proxima_caja)}` : '')
+          }
+          rojo={r.retiroCajaFuerte < 0}
+        />
         <Dato titulo="Venta total + boletería + guardarropas" valor={formatoPesos(r.ventaTotalGeneral)} destacado ancho />
       </div>
 
@@ -71,11 +79,26 @@ export function ResumenCajaEvento({ detalle }: { detalle: DetalleEvento }) {
 
 const colorDif = (v: number | null) => (v == null ? 'text-suave' : v === 0 ? 'text-emerald-400' : v < 0 ? 'text-alerta' : 'text-amber-300')
 
-function Dato({ titulo, valor, destacado, ancho, rojo }: { titulo: string; valor: string; destacado?: boolean; ancho?: boolean; rojo?: boolean }) {
+function Dato({
+  titulo,
+  valor,
+  detalle,
+  destacado,
+  ancho,
+  rojo,
+}: {
+  titulo: string
+  valor: string
+  detalle?: string
+  destacado?: boolean
+  ancho?: boolean
+  rojo?: boolean
+}) {
   return (
     <Tarjeta className={cx('px-3 py-2.5', destacado && 'border-marca-500', ancho && 'col-span-2 sm:col-span-3')}>
       <p className="text-xs text-suave">{titulo}</p>
       <p className={cx('tabular text-lg font-semibold', destacado && 'texto-plata', rojo && 'text-alerta')}>{valor}</p>
+      {detalle && <p className="tabular text-[11px] text-suave">{detalle}</p>}
     </Tarjeta>
   )
 }

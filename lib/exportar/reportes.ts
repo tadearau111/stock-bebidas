@@ -381,7 +381,7 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
       total: ['VENTA TOTAL + BOLETERÍA + GUARDARROPAS', caja.ventaTotalGeneral],
       nota:
         `Vasos no devueltos: ${c.vasos_no_devueltos ?? 0}. ` +
-        'Diferencia = real - sistema (negativo: falta plata). Retiro a caja fuerte = todo el efectivo (barras + boletería + guardarropas) - gastos - cambio para la próxima caja.',
+        'Diferencia = real - sistema (negativo: falta plata). Retiro a caja fuerte = efectivo real (barras + boletería + guardarropas) - gastos - cambio para la próxima caja.',
     })
     if (detalle.gastos.length) {
       secciones.push({
@@ -488,7 +488,7 @@ export function reporteEvento(detalle: DetalleEvento, articulos: ArticuloPrecio[
       '',
       `Cambio próxima caja: ${$(c.cambio_proxima_caja)} · Vasos no devueltos: ${c.vasos_no_devueltos ?? 0}`,
       `*Venta total + boletería + guardarropas:* ${$(caja.ventaTotalGeneral)}`,
-      `*Retiro a caja fuerte:* ${$(caja.retiroCajaFuerte)}`,
+      `*Retiro a caja fuerte:* ${$(caja.retiroCajaFuerte)} (efectivo real ${$(caja.efectivoTotal)} − gastos ${$(caja.totalGastos)}${c.cambio_proxima_caja ? ` − cambio ${$(c.cambio_proxima_caja)}` : ''})`,
     )
   }
 

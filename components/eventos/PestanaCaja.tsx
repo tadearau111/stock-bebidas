@@ -189,7 +189,10 @@ export function PestanaCaja({ detalle }: { detalle: DetalleEvento }) {
           <Resultado
             titulo="Retiro a caja fuerte"
             valor={formatoPesos(r.retiroCajaFuerte)}
-            detalle={`Efectivo total ${formatoPesos(r.efectivoTotal)} − gastos ${formatoPesos(r.totalGastos)} − cambio ${formatoPesos(valores.cambio_proxima_caja || 0)}`}
+            detalle={
+              `Efectivo real ${formatoPesos(r.efectivoTotal)} − gastos ${formatoPesos(r.totalGastos)}` +
+              (valores.cambio_proxima_caja ? ` − cambio ${formatoPesos(valores.cambio_proxima_caja)}` : '')
+            }
             rojo={r.retiroCajaFuerte < 0}
           />
           <Resultado titulo="Venta total + boletería + guardarropas" valor={formatoPesos(r.ventaTotalGeneral)} />
