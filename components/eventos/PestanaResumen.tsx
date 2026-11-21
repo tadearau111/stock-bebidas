@@ -78,6 +78,9 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
         />
       </div>
 
+      {/* La caja completa, arriba de todo (solo quien puede ver la Caja) */}
+      {puede('eventos.caja') && <ResumenCajaEvento detalle={detalle} />}
+
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Dato titulo="Personas" valor={formatoNumero(evento.personas)} />
         <Dato titulo="Barras" valor={formatoNumero(barras.length)} />
@@ -256,9 +259,6 @@ export function PestanaResumen({ detalle }: { detalle: DetalleEvento }) {
           </Tarjeta>
         )}
       </section>
-
-      {/* La caja completa (solo quien puede ver la Caja) */}
-      {puede('eventos.caja') && <ResumenCajaEvento detalle={detalle} />}
     </div>
   )
 }
