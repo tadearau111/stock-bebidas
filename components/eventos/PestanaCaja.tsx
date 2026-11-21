@@ -4,6 +4,7 @@ import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Aviso, Boton, Campo, Tarjeta, cx } from '@/components/ui'
 import { CAJA_VACIA, calcularCaja, textoDiferencia, type DatosCaja } from '@/lib/calculos/caja'
 import { resumirCajeros } from '@/lib/calculos/cajeros'
+import { ResumenCajas } from './ResumenCajas'
 import { formatoFechaHora, formatoHora, formatoPesos, leerPrecio, mensajeError } from '@/lib/formato'
 import { aPapelera, guardarCaja, insertar } from '@/lib/offline/cola'
 import { useCargaEvento } from '@/lib/offline/sincronizar'
@@ -73,7 +74,8 @@ export function PestanaCaja({ detalle }: { detalle: DetalleEvento }) {
     e?.preventDefault()
     setError('')
     if (invalidos.length) return setError('Hay montos que no son válidos. Usá solo números (ej: 125.000 o 125000,50).')
-    if (valores.vasos_no_devueltos != null && !Number.isInteger(valores.vasos_no_devueltos)) return setError('Los vasos no devueltos tienen que ser un número entero.')
+    if (valores.vasos_no_devueltos != null && !Number.isInteger(valores.vasos_no_devueltos))
+      return setError('Los vasos no devueltos tienen que ser un número entero.')
     try {
       // Lo que se suma solo desde los cajeros no se manda (lo calcula la base)
       const datos = Object.fromEntries(Object.entries(valores).filter(([k]) => !esAuto(k as CampoCaja)))
@@ -132,34 +134,32 @@ export function PestanaCaja({ detalle }: { detalle: DetalleEvento }) {
         <Total titulo="Venta total + boletería + guardarropas" valor={formatoPesos(r.ventaTotalGeneral)} destacado />
       </div>
 
-      <Bloque
-        titulo="Barras"
-        ayuda={
-          automatico
-            ? 'Se suma sola con el resumen de todas las cajas de la pestaña Cajeros (efectivo real = total retirado a los cajeros).'
-            : 'Efectivo y tarjetas reales contra lo que dice el sistema de venta.'
-        }
-      >
-        {hayCajeros && !automatico && (
-          <Aviso tipo="info">
-            En este evento los números de Barras se cargaron a mano.{' '}
-            <button type="button" onClick={usarResumenCajeros} className="font-semibold underline">
-              Usar el resumen de cajeros
-            </button>
-          </Aviso>
-        )}
-        <div className="grid grid-cols-2 gap-3">
-          {campo('efectivo_real', 'Efectivo real', 'Lo que hay en la caja')}
-          {campo('efectivo_sistema', 'Efectivo sistema', 'Según el sistema de venta')}
-          {campo('cierre_lotes', 'Cierre de lotes', 'Lo que dicen los posnet')}
-          {campo('tarjetas_sistema', 'Tarjetas sistema', 'Según el sistema de venta')}
-        </div>
-        <div className="grid gap-2 sm:grid-cols-3">
-          <Diferencia titulo="Diferencia efectivo" valor={r.diferenciaEfectivo} />
-          <Diferencia titulo="Diferencia tarjetas" valor={r.diferenciaTarjetas} />
-          <Resultado titulo="Venta total caja" valor={formatoPesos(r.ventaCaja)} />
-        </div>
-      </Bloque>
+      {/* Con cajeros: el resumen de todas las cajas reemplaza al bloque Barras (se suma solo) */}
+      {automatico ? (
+        <ResumenCajas detalle={detalle} ventaCaja={r.ventaCaja} />
+      ) : (
+        <Bloque titulo="Barras" ayuda="Efectivo y tarjetas reales contra lo que dice el sistema de venta.">
+          {hayCajeros && !automatico && (
+            <Aviso tipo="info">
+              En este evento los números de Barras se cargaron a mano.{' '}
+              <button type="button" onClick={usarResumenCajeros} className="font-semibold underline">
+                Usar el resumen de cajeros
+              </button>
+            </Aviso>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            {campo('efectivo_real', 'Efectivo real', 'Lo que hay en la caja')}
+            {campo('efectivo_sistema', 'Efectivo sistema', 'Según el sistema de venta')}
+            {campo('cierre_lotes', 'Cierre de lotes', 'Lo que dicen los posnet')}
+            {campo('tarjetas_sistema', 'Tarjetas sistema', 'Según el sistema de venta')}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <Diferencia titulo="Diferencia efectivo" valor={r.diferenciaEfectivo} />
+            <Diferencia titulo="Diferencia tarjetas" valor={r.diferenciaTarjetas} />
+            <Resultado titulo="Venta total caja" valor={formatoPesos(r.ventaCaja)} />
+          </div>
+        </Bloque>
+      )}
 
       <div className="grid gap-5 md:grid-cols-2">
         <Bloque titulo="Boletería" ayuda="No pasa por el sistema de venta.">

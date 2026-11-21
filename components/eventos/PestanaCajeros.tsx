@@ -2,9 +2,9 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useId, useState } from 'react'
-import { Aviso, Boton, Campo, Tarjeta, cx } from '@/components/ui'
-import { textoDiferencia } from '@/lib/calculos/caja'
+import { Aviso, Boton, Campo, Tarjeta } from '@/components/ui'
 import { resumirCajeros, type ResumenCajero } from '@/lib/calculos/cajeros'
+import { DiferenciaCaja } from './ResumenCajas'
 import { formatoHora, formatoPesos, leerPrecio, mensajeError } from '@/lib/formato'
 import { actualizar, aPapelera, insertar } from '@/lib/offline/cola'
 import { useCargaEvento } from '@/lib/offline/sincronizar'
@@ -76,29 +76,16 @@ export function PestanaCajeros({ detalle }: { detalle: DetalleEvento }) {
       <div>
         <h2 className="text-xl font-semibold">Cajeros</h2>
         <p className="text-sm text-suave">
-          Anotá cada retiro de dinero que se le hace a un cajero durante la noche y, al cerrar, lo que dice el sistema y los posnet de su caja. El{' '}
-          <b>resumen de todas las cajas</b> pasa solo a la pestaña <b>Caja</b> (bloque Barras): efectivo real = total retirado a los cajeros.
+          Anotá cada retiro de dinero que se le hace a un cajero durante la noche y, al cerrar, lo que dice el sistema y los posnet de su caja. Todo se
+          suma solo en la pestaña <b>Caja</b>: efectivo real = total retirado a los cajeros.
         </p>
       </div>
 
-      {/* Resumen de todas las cajas (mismo orden que el bloque Barras de la pestaña Caja) */}
-      <Tarjeta className="space-y-3 border-marca-500 p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-lg font-semibold">Resumen de todas las cajas</h3>
-          <p className="text-xs text-suave">
-            {detalle.cajeros.length} {detalle.cajeros.length === 1 ? 'cajero' : 'cajeros'} · {resumen.cantidad}{' '}
-            {resumen.cantidad === 1 ? 'retiro' : 'retiros'}
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Dato titulo="Efectivo real (total retirado)" valor={formatoPesos(resumen.total)} destacado />
-          <Dato titulo="Efectivo sistema" valor={formatoPesos(resumen.efectivoSistema)} />
-          <Dato titulo="Cierre de lotes" valor={formatoPesos(resumen.cierreLotes)} />
-          <Dato titulo="Tarjetas sistema" valor={formatoPesos(resumen.tarjetasSistema)} />
-          <Diferencia titulo="Diferencia efectivo" valor={resumen.diferenciaEfectivo} />
-          <Diferencia titulo="Diferencia tarjetas" valor={resumen.diferenciaTarjetas} />
-        </div>
-      </Tarjeta>
+      {resumen.cajeros.length > 0 && (
+        <Aviso tipo="info">
+          El <b>resumen de todas las cajas</b> (efectivo real, sistema, lotes, tarjetas y diferencias) está en la pestaña <b>Caja</b>.
+        </Aviso>
+      )}
 
       {resumen.cajeros.length === 0 && (
         <Aviso tipo="info">Todavía no hay cajeros en este evento. Agregá el nombre de cada uno abajo.</Aviso>
@@ -307,8 +294,8 @@ function CierreCajero({ c, eventoId }: { c: ResumenCajero; eventoId: string }) {
         <Campo etiqueta="Tarjetas sistema" inputMode="decimal" placeholder="$ 0" value={tarjetas} onChange={(e) => setTarjetas(e.target.value)} />
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Diferencia titulo="Diferencia efectivo" valor={c.diferenciaEfectivo} ayuda={`Retirado ${formatoPesos(c.total)} − sistema`} />
-        <Diferencia titulo="Diferencia tarjetas" valor={c.diferenciaTarjetas} ayuda="Lotes − sistema" />
+        <DiferenciaCaja titulo="Diferencia efectivo" valor={c.diferenciaEfectivo} ayuda={`Retirado ${formatoPesos(c.total)} − sistema`} />
+        <DiferenciaCaja titulo="Diferencia tarjetas" valor={c.diferenciaTarjetas} ayuda="Lotes − sistema" />
       </div>
       {hayCambios && (
         <Boton className="w-full" onClick={guardar} cargando={carga.guardando}>
@@ -317,30 +304,6 @@ function CierreCajero({ c, eventoId }: { c: ResumenCajero; eventoId: string }) {
       )}
       {ok && <Aviso tipo="ok">✓ {ok}</Aviso>}
       {error && <Aviso>{error}</Aviso>}
-    </div>
-  )
-}
-
-// ------------------------------------------------------------------ Piezas
-
-function Dato({ titulo, valor, destacado }: { titulo: string; valor: string; destacado?: boolean }) {
-  return (
-    <div className="rounded-lg bg-realce px-3 py-2.5">
-      <p className="text-xs text-suave">{titulo}</p>
-      <p className={cx('tabular text-lg font-semibold', destacado && 'texto-plata')}>{valor}</p>
-    </div>
-  )
-}
-
-/** Diferencia con colores, igual que en la pestaña Caja. Vacía mientras no se cargó lo del sistema. */
-function Diferencia({ titulo, valor, ayuda }: { titulo: string; valor: number | null; ayuda?: string }) {
-  const color = valor == null ? 'text-suave' : valor === 0 ? 'text-emerald-400' : valor < 0 ? 'text-alerta' : 'text-amber-300'
-  return (
-    <div className="rounded-lg bg-realce px-3 py-2.5">
-      <p className="text-xs text-suave">{titulo}</p>
-      <p className={cx('tabular text-lg font-semibold', color)}>{valor == null ? '—' : formatoPesos(valor)}</p>
-      <p className={cx('text-[11px]', color)}>{valor == null ? 'Falta cargar el sistema' : textoDiferencia(valor, formatoPesos)}</p>
-      {ayuda && <p className="text-[11px] text-suave">{ayuda}</p>}
     </div>
   )
 }
